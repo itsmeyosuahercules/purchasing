@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Http\Requests\UpdateOrderPoRequest;
 use App\Exports\OrdersExport;
 use App\Http\Controllers\Controller;
+use App\Jobs\SendOrderWhatsappJob;
 use App\Models\Order;
 use App\Services\OrderApprovalService;
 use App\Services\OrderPdfService;
@@ -52,7 +53,11 @@ class OrderController extends Controller
     {
         $order->load(['user', 'supplier', 'items', 'approver']);
 
-        return view('admin.orders.show', compact('order'));
+        $whatsappSending = \Illuminate\Support\Facades\Cache::has(
+            SendOrderWhatsappJob::sendingLockKey($order->id),
+        );
+
+        return view('admin.orders.show', compact('order', 'whatsappSending'));
     }
 
     public function approve(Order $order)

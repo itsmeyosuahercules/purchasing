@@ -5,46 +5,21 @@ namespace App\Jobs;
 use App\Exceptions\WatzapDeliveryException;
 use App\Models\Order;
 use App\Services\OrderWhatsappDeliveryService;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Log;
 
-class SendOrderWhatsappJob implements ShouldBeUnique, ShouldQueue
+/**
+ * Bukan queue job — dijalankan via artisan orders:send-whatsapp (proses PHP terpisah).
+ */
+class SendOrderWhatsappJob
 {
-    use Queueable;
-
-    public int $tries = 3;
-
-    /** @var array<int, int> */
-    public array $backoff = [30, 120, 300];
-
-    public int $uniqueFor = 90;
-
     public function __construct(
         public int $orderId,
         public bool $force = false,
     ) {}
 
-    public function uniqueId(): string
+    public static function sendingLockKey(int $orderId): string
     {
-        if ($this->force) {
-            return 'watzap-order-'.$this->orderId.'-'.microtime(true);
-        }
-
-        return 'watzap-order-'.$this->orderId;
-    }
-
-    /**
-     * @return array<int, object>
-     */
-    public function middleware(): array
-    {
-        return [
-            (new WithoutOverlapping('watzap-order-'.$this->orderId))
-                ->expireAfter(300),
-        ];
+        return 'watzap-sending:'.$orderId;
     }
 
     public function handle(OrderWhatsappDeliveryService $deliveryService): void
@@ -52,6 +27,7 @@ class SendOrderWhatsappJob implements ShouldBeUnique, ShouldQueue
         Log::info('WhatsApp job mulai', [
             'order_id' => $this->orderId,
             'force' => $this->force,
+            'pid' => getmypid(),
         ]);
 
         $order = Order::query()->find($this->orderId);
@@ -101,6 +77,7 @@ class SendOrderWhatsappJob implements ShouldBeUnique, ShouldQueue
                 'order_id' => $this->orderId,
                 'sent_at' => $order->supplier_whatsapp_sent_at,
                 'error' => $order->supplier_whatsapp_error,
+                'pid' => getmypid(),
             ]);
         } catch (WatzapDeliveryException $e) {
             $order->refresh();
@@ -124,24 +101,6 @@ class SendOrderWhatsappJob implements ShouldBeUnique, ShouldQueue
             ]);
 
             throw $e;
-        }
-    }
-
-    public function failed(?\Throwable $exception): void
-    {
-        $order = Order::query()->find($this->orderId);
-
-        if (! $order) {
-            return;
-        }
-
-        Log::error('Gagal mengirim WhatsApp pesanan setelah semua percobaan', [
-            'order_id' => $order->id,
-            'message' => $exception?->getMessage(),
-        ]);
-
-        if (blank($order->supplier_whatsapp_error)) {
-            $this->recordFailure($order, $exception?->getMessage() ?? 'Gagal mengirim WhatsApp.');
         }
     }
 

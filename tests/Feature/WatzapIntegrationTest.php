@@ -285,10 +285,26 @@ class WatzapIntegrationTest extends TestCase
             'supplier_whatsapp_error' => 'Teks terkirim, PDF gagal: contoh error',
         ])->save();
 
-        $job = new SendOrderWhatsappJob($order->id);
-        $job->handle(app(OrderWhatsappDeliveryService::class));
+        (new SendOrderWhatsappJob($order->id))->handle(app(OrderWhatsappDeliveryService::class));
 
         Http::assertNothingSent();
+    }
+
+    public function test_resend_whatsapp_rejects_while_send_in_progress(): void
+    {
+        $order = $this->approvedOrder();
+        $admin = User::where('username', 'admin')->firstOrFail();
+
+        \Illuminate\Support\Facades\Cache::put(
+            SendOrderWhatsappJob::sendingLockKey($order->id),
+            now()->toIso8601String(),
+            now()->addMinutes(5),
+        );
+
+        $this->actingAs($admin)
+            ->post("/admin/orders/{$order->id}/resend-whatsapp")
+            ->assertRedirect()
+            ->assertSessionHas('error');
     }
 
     public function test_resend_whatsapp_rejects_watzap_file_server_error(): void
