@@ -90,21 +90,24 @@ class OrderPdfService
 
     /**
      * Publish PDF as a static public file for WatZap (no signed URL / PHP route).
+     * URL diakhiri nama file ramah pengguna; folder token acak mencegah tebak URL.
      *
-     * @return array{token: string, url: string, path: string}
+     * @return array{relative_path: string, url: string, path: string, filename: string}
      */
     public function publishForWatzap(Order $order): array
     {
         $order->loadMissing(['supplier', 'items', 'user', 'approver']);
 
-        $token = Str::random(48);
-        $dir = public_path('watzap-delivery');
+        $filename = $this->filename($order);
+        $token = Str::random(32);
+        $relativePath = $token.'/'.$filename;
+        $dir = public_path('watzap-delivery'.DIRECTORY_SEPARATOR.$token);
 
         if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
             throw new \RuntimeException('Folder public/watzap-delivery tidak dapat dibuat.');
         }
 
-        $absolutePath = $dir.DIRECTORY_SEPARATOR.$token.'.pdf';
+        $absolutePath = $dir.DIRECTORY_SEPARATOR.$filename;
 
         try {
             $pdf = $this->make($order)->output();
@@ -125,18 +128,33 @@ class OrderPdfService
         }
 
         return [
-            'token' => $token,
-            'url' => rtrim((string) config('app.url'), '/').'/watzap-delivery/'.$token.'.pdf',
+            'relative_path' => $relativePath,
+            'filename' => $filename,
+            'url' => rtrim((string) config('app.url'), '/').'/watzap-delivery/'.$relativePath,
             'path' => $absolutePath,
         ];
     }
 
-    public function cleanupWatzapPublication(string $token): void
+    public function cleanupWatzapPublication(string $relativePath): void
     {
-        $path = public_path('watzap-delivery'.DIRECTORY_SEPARATOR.$token.'.pdf');
+        $relativePath = str_replace('\\', '/', $relativePath);
+        $relativePath = ltrim($relativePath, '/');
+
+        if (str_contains($relativePath, '..')) {
+            return;
+        }
+
+        $path = public_path('watzap-delivery'.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath));
 
         if (is_file($path)) {
             @unlink($path);
+        }
+
+        $tokenDir = dirname($path);
+        $deliveryRoot = realpath(public_path('watzap-delivery'));
+
+        if ($deliveryRoot && is_dir($tokenDir) && str_starts_with(realpath($tokenDir) ?: '', $deliveryRoot)) {
+            @rmdir($tokenDir);
         }
     }
 }

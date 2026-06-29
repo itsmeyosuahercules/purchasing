@@ -26,7 +26,12 @@ return [
 
     'file_timeout' => (int) env('WATZAP_FILE_TIMEOUT', 120),
 
-    'send_delay_seconds' => (int) env('WATZAP_SEND_DELAY', 2),
+    'send_delay_seconds' => (int) env('WATZAP_SEND_DELAY', 5),
+
+    /*
+    | Beri waktu server WatZap mengunduh PDF dari URL publik sebelum file dihapus.
+    */
+    'file_cleanup_delay_minutes' => (int) env('WATZAP_FILE_CLEANUP_DELAY', 5),
 
     /*
     | Signed URL untuk PDF yang di-fetch server WatZap. APP_URL harus dapat

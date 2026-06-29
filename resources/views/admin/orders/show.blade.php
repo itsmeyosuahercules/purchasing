@@ -124,7 +124,7 @@
                                 </x-button>
                             </form>
                             <form method="POST" action="{{ route('admin.orders.resend-whatsapp', $order) }}"
-                                  onsubmit="return confirm('Kirim{{ $order->supplier_whatsapp_sent_at ? ' ulang' : '' }} WhatsApp ke supplier?')">
+                                  onsubmit="this.querySelector('button[type=submit]')?.setAttribute('disabled', 'disabled'); return confirm('Kirim{{ $order->supplier_whatsapp_sent_at ? ' ulang' : '' }} WhatsApp ke supplier?')">
                                 @csrf
                                 <x-button type="submit" :variant="$order->supplier_whatsapp_sent_at ? 'secondary' : 'primary'">
                                     <x-icon name="whatsapp" class="w-4 h-4" />

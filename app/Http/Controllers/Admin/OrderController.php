@@ -119,12 +119,12 @@ class OrderController extends Controller
     {
         try {
             $this->approvalService->resendWhatsapp($order);
-        } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Gagal mengirim WhatsApp: '.$e->getMessage());
         }
 
         return redirect()->route('admin.orders.show', $order)
-            ->with('success', 'WhatsApp pesanan berhasil dikirim ulang ke supplier.');
+            ->with('success', 'WhatsApp sedang dikirim ke supplier. Refresh halaman ini dalam beberapa detik untuk melihat status terbaru.');
     }
 
     public function reject(Request $request, Order $order)

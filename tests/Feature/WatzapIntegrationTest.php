@@ -156,8 +156,7 @@ class WatzapIntegrationTest extends TestCase
 
             return $request->url() === 'https://api.watzap.id/v1/send_file_url'
                 && $body['phone_no'] === '628123456789'
-                && str_contains($body['url'], '/watzap-delivery/')
-                && str_ends_with($body['url'], '.pdf')
+                && str_ends_with($body['url'], '/'.$filename)
                 && ($body['filename'] ?? '') === $filename
                 && ! isset($body['message']);
         });
@@ -264,7 +263,23 @@ class WatzapIntegrationTest extends TestCase
             // expected
         }
 
-        $this->assertEmpty(glob(public_path('watzap-delivery').DIRECTORY_SEPARATOR.'*.pdf') ?: []);
+        $this->assertEmpty(glob(public_path('watzap-delivery').'/*/*.pdf') ?: []);
+    }
+
+    public function test_whatsapp_job_skips_retry_when_text_already_sent(): void
+    {
+        Http::fake();
+
+        $order = $this->approvedOrder();
+        $order->forceFill([
+            'supplier_whatsapp_sent_at' => now(),
+            'supplier_whatsapp_error' => 'Teks terkirim, PDF gagal: contoh error',
+        ])->save();
+
+        $job = new SendOrderWhatsappJob($order->id);
+        $job->handle(app(OrderWhatsappDeliveryService::class));
+
+        Http::assertNothingSent();
     }
 
     public function test_resend_whatsapp_rejects_watzap_file_server_error(): void
@@ -287,7 +302,7 @@ class WatzapIntegrationTest extends TestCase
         $this->actingAs($admin)
             ->post("/admin/orders/{$order->id}/resend-whatsapp")
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHas('success');
 
         $order->refresh();
         $this->assertStringContainsString('Teks terkirim', $order->supplier_whatsapp_error ?? '');
@@ -295,8 +310,14 @@ class WatzapIntegrationTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob(public_path('watzap-delivery').DIRECTORY_SEPARATOR.'*.pdf') ?: [] as $pdf) {
+        foreach (glob(public_path('watzap-delivery').'/*/*.pdf') ?: [] as $pdf) {
             @unlink($pdf);
+        }
+
+        foreach (glob(public_path('watzap-delivery').'/*') ?: [] as $dir) {
+            if (is_dir($dir)) {
+                @rmdir($dir);
+            }
         }
 
         parent::tearDown();
@@ -309,12 +330,14 @@ class WatzapIntegrationTest extends TestCase
 
         $this->assertFileExists($publication['path']);
         $this->assertStringStartsWith('%PDF', (string) file_get_contents($publication['path']));
+        $this->assertSame('purchase-order-'.$order->order_number.'.pdf', $publication['filename']);
         $this->assertSame(
-            rtrim((string) config('app.url'), '/').'/watzap-delivery/'.$publication['token'].'.pdf',
+            rtrim((string) config('app.url'), '/').'/watzap-delivery/'.$publication['relative_path'],
             $publication['url'],
         );
+        $this->assertStringEndsWith($publication['filename'], $publication['url']);
 
-        app(\App\Services\OrderPdfService::class)->cleanupWatzapPublication($publication['token']);
+        app(\App\Services\OrderPdfService::class)->cleanupWatzapPublication($publication['relative_path']);
         $this->assertFileDoesNotExist($publication['path']);
     }
 

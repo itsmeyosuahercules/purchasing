@@ -81,18 +81,8 @@ class OrderApprovalService
             throw new \RuntimeException('WatZap belum diaktifkan atau API Key / Number Key belum dikonfigurasi.');
         }
 
-        $order->load(['supplier', 'items', 'user']);
-
-        try {
-            $this->whatsappDeliveryService->sendToSupplier($order);
-        } catch (\Throwable $e) {
-            Log::error('Gagal mengirim ulang WhatsApp pesanan', [
-                'order_id' => $order->id,
-                'message' => $e->getMessage(),
-            ]);
-
-            throw new \RuntimeException('Gagal mengirim WhatsApp: '.$e->getMessage(), 0, $e);
-        }
+        SendOrderWhatsappJob::dispatch($order->id, force: true)
+            ->onQueue((string) config('watzap.queue', 'default'));
 
         return $order->fresh(['supplier', 'items', 'user', 'approver']);
     }
