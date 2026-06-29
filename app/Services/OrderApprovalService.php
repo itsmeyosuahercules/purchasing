@@ -184,9 +184,7 @@ class OrderApprovalService
             $command[] = '--force';
         }
 
-        Process::path(base_path())
-            ->timeout(null)
-            ->start($command);
+        Process::path(base_path())->start($command);
     }
 
     private function whatsappSendInProgress(int $orderId): bool
