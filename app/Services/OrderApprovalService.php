@@ -81,8 +81,9 @@ class OrderApprovalService
             throw new \RuntimeException('WatZap belum diaktifkan atau API Key / Number Key belum dikonfigurasi.');
         }
 
-        SendOrderWhatsappJob::dispatch($order->id, force: true)
-            ->onQueue((string) config('watzap.queue', 'default'));
+        $order->forceFill(['supplier_whatsapp_error' => null])->save();
+
+        $this->dispatchWhatsappJob($order->id, force: true);
 
         return $order->fresh(['supplier', 'items', 'user', 'approver']);
     }
@@ -136,7 +137,16 @@ class OrderApprovalService
             return;
         }
 
-        SendOrderWhatsappJob::dispatch($order->id)
-            ->onQueue((string) config('watzap.queue', 'default'));
+        $this->dispatchWhatsappJob($order->id);
+    }
+
+    private function dispatchWhatsappJob(int $orderId, bool $force = false): void
+    {
+        Log::info('WhatsApp pesanan dijadwalkan (setelah response)', [
+            'order_id' => $orderId,
+            'force' => $force,
+        ]);
+
+        SendOrderWhatsappJob::dispatch($orderId, $force)->afterResponse();
     }
 }

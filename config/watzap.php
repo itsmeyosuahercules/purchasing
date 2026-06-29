@@ -45,6 +45,4 @@ return [
     */
     'attach_pdf' => env('WATZAP_ATTACH_PDF'),
 
-    'queue' => env('WATZAP_QUEUE', 'default'),
-
 ];

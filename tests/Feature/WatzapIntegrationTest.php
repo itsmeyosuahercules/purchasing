@@ -12,7 +12,6 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
@@ -82,9 +81,16 @@ class WatzapIntegrationTest extends TestCase
         return $order->fresh(['supplier', 'items']);
     }
 
-    public function test_approve_dispatches_whatsapp_job_when_watzap_enabled(): void
+    public function test_approve_sends_whatsapp_when_watzap_enabled(): void
     {
-        Queue::fake();
+        config(['watzap.attach_pdf' => false]);
+
+        Http::fake([
+            'https://api.watzap.id/v1/send_message' => Http::response([
+                'status' => true,
+                'message' => 'success',
+            ]),
+        ]);
 
         $employee = User::create([
             'name' => 'Karyawan', 'username' => 'karyawan', 'password' => 'password',
@@ -115,7 +121,10 @@ class WatzapIntegrationTest extends TestCase
 
         $this->actingAs($admin)->post("/admin/orders/{$order->id}/approve")->assertRedirect();
 
-        Queue::assertPushed(SendOrderWhatsappJob::class, fn (SendOrderWhatsappJob $job) => $job->orderId === $order->id);
+        $order->refresh();
+        $this->assertNotNull($order->supplier_whatsapp_sent_at);
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.watzap.id/v1/send_message');
     }
 
     public function test_resend_whatsapp_calls_watzap_api_with_pdf_url(): void

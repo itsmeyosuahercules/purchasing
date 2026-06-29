@@ -124,7 +124,7 @@ class OrderController extends Controller
         }
 
         return redirect()->route('admin.orders.show', $order)
-            ->with('success', 'WhatsApp sedang dikirim ke supplier. Refresh halaman ini dalam beberapa detik untuk melihat status terbaru.');
+            ->with('success', 'WhatsApp sedang dikirim. Tunggu ~10 detik lalu refresh halaman ini.');
     }
 
     public function reject(Request $request, Order $order)
