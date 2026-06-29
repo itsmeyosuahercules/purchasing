@@ -18,6 +18,8 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+/public/watzap-delivery/*
+!/public/watzap-delivery/.gitignore
 /storage/*.key
 /storage/pail
 /vendor

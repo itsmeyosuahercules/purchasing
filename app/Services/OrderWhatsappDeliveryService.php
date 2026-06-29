@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Exceptions\WatzapDeliveryException;
 use App\Models\Order;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 
 class OrderWhatsappDeliveryService
@@ -53,11 +55,15 @@ class OrderWhatsappDeliveryService
         $phone = $order->supplier->whatsapp;
 
         if ($this->shouldAttachPdf()) {
-            $this->pdfService->ensureDeliveryCache($order);
+            $publication = $this->pdfService->publishForWatzap($order);
+            $pdfToken = $publication['token'];
+            $pdfUrl = $publication['url'];
 
             $textSent = false;
 
             try {
+                $this->verifyPdfUrlAccessible($pdfUrl, $publication['path']);
+
                 $this->watzapService->sendText($phone, $message);
                 $textSent = true;
 
@@ -68,7 +74,7 @@ class OrderWhatsappDeliveryService
 
                 $this->watzapService->sendFileUrl(
                     $phone,
-                    $this->signedPdfUrl($order),
+                    $pdfUrl,
                     filename: $this->pdfService->filename($order),
                 );
             } catch (\Throwable $e) {
@@ -84,6 +90,8 @@ class OrderWhatsappDeliveryService
                 }
 
                 throw $e;
+            } finally {
+                $this->pdfService->cleanupWatzapPublication($pdfToken);
             }
         } else {
             $this->watzapService->sendText($phone, $message);
@@ -129,5 +137,50 @@ class OrderWhatsappDeliveryService
         return ! str_ends_with($host, '.test')
             && ! str_ends_with($host, '.local')
             && ! str_ends_with($host, '.localhost');
+    }
+
+    /**
+     * Pastikan PDF benar-benar bisa di-fetch sebelum WatZap mencoba (cegah error 1005).
+     */
+    private function verifyPdfUrlAccessible(string $pdfUrl, string $absolutePath): void
+    {
+        if (! is_file($absolutePath) || filesize($absolutePath) < 100) {
+            throw new WatzapDeliveryException('File PDF tidak ada atau rusak di server.');
+        }
+
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        try {
+            $response = Http::timeout(20)
+                ->withOptions(['allow_redirects' => true])
+                ->get($pdfUrl);
+        } catch (\Throwable $e) {
+            Log::warning('Self-check URL PDF WatZap gagal', [
+                'url' => $pdfUrl,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new WatzapDeliveryException(
+                'PDF tidak dapat diakses dari URL publik ('.$pdfUrl.'): '.$e->getMessage()
+                .'. Periksa APP_URL dan izin folder public/watzap-delivery.',
+            );
+        }
+
+        if (! $response->successful()) {
+            throw new WatzapDeliveryException(
+                'PDF URL mengembalikan HTTP '.$response->status()
+                .'. Buka '.$pdfUrl.' di browser untuk diagnosa.',
+            );
+        }
+
+        $body = $response->body();
+
+        if (strlen($body) < 100 || ! str_starts_with($body, '%PDF')) {
+            throw new WatzapDeliveryException(
+                'PDF URL tidak mengembalikan file PDF valid. Kemungkinan APP_URL salah atau server memblokir akses eksternal.',
+            );
+        }
     }
 }

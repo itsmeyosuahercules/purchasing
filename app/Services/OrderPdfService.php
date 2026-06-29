@@ -9,6 +9,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdfDocument;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderPdfService
@@ -85,5 +86,57 @@ class OrderPdfService
             $this->filename($order),
             ['Content-Type' => 'application/pdf'],
         );
+    }
+
+    /**
+     * Publish PDF as a static public file for WatZap (no signed URL / PHP route).
+     *
+     * @return array{token: string, url: string, path: string}
+     */
+    public function publishForWatzap(Order $order): array
+    {
+        $order->loadMissing(['supplier', 'items', 'user', 'approver']);
+
+        $token = Str::random(48);
+        $dir = public_path('watzap-delivery');
+
+        if (! is_dir($dir) && ! mkdir($dir, 0755, true) && ! is_dir($dir)) {
+            throw new \RuntimeException('Folder public/watzap-delivery tidak dapat dibuat.');
+        }
+
+        $absolutePath = $dir.DIRECTORY_SEPARATOR.$token.'.pdf';
+
+        try {
+            $pdf = $this->make($order)->output();
+            file_put_contents($absolutePath, $pdf);
+        } catch (\Throwable $e) {
+            Log::error('Gagal publish PDF statis untuk WatZap', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+
+        if (! is_file($absolutePath) || filesize($absolutePath) < 100) {
+            @unlink($absolutePath);
+
+            throw new \RuntimeException('File PDF WatZap kosong atau tidak valid.');
+        }
+
+        return [
+            'token' => $token,
+            'url' => rtrim((string) config('app.url'), '/').'/watzap-delivery/'.$token.'.pdf',
+            'path' => $absolutePath,
+        ];
+    }
+
+    public function cleanupWatzapPublication(string $token): void
+    {
+        $path = public_path('watzap-delivery'.DIRECTORY_SEPARATOR.$token.'.pdf');
+
+        if (is_file($path)) {
+            @unlink($path);
+        }
     }
 }

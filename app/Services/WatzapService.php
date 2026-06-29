@@ -196,7 +196,7 @@ class WatzapService
         $message ??= 'WatZap mengembalikan HTTP '.$response->status();
 
         if (($body['status'] ?? null) === '1005' || ($body['ack'] ?? null) === 'fatal_error') {
-            $message .= ' — WatZap gagal mengunduh PDF. Buka URL PDF di browser (signed link) untuk cek error server.';
+            $message .= ' — WatZap gagal mengunduh PDF. Pastikan APP_URL benar dan file di public/watzap-delivery dapat diakses publik (HTTPS).';
         }
 
         return $message;
