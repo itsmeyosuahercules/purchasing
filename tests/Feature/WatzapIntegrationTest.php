@@ -30,6 +30,8 @@ class WatzapIntegrationTest extends TestCase
             'watzap.number_key' => 'test-number-key',
             'watzap.base_url' => 'https://api.watzap.id/v1',
             'watzap.attach_pdf' => true,
+            'app.url' => 'https://purchasing.example.com',
+            'watzap.send_delay_seconds' => 0,
         ]);
     }
 
@@ -118,6 +120,10 @@ class WatzapIntegrationTest extends TestCase
     public function test_resend_whatsapp_calls_watzap_api_with_pdf_url(): void
     {
         Http::fake([
+            'https://api.watzap.id/v1/send_message' => Http::response([
+                'status' => true,
+                'message' => 'success',
+            ]),
             'https://api.watzap.id/v1/send_file_url' => Http::response([
                 'status' => true,
                 'message' => 'success',
@@ -139,12 +145,19 @@ class WatzapIntegrationTest extends TestCase
         Http::assertSent(function ($request) {
             $body = $request->data();
 
-            return $request->url() === 'https://api.watzap.id/v1/send_file_url'
-                && $body['api_key'] === 'test-api-key'
-                && $body['number_key'] === 'test-number-key'
-                && $body['phone_no'] === '628123456789'
-                && str_contains($body['url'], '/delivery/orders/')
+            return $request->url() === 'https://api.watzap.id/v1/send_message'
                 && str_contains($body['message'], 'PT Supplier');
+        });
+
+        Http::assertSent(function ($request) use ($order) {
+            $body = $request->data();
+            $filename = 'purchase-order-'.$order->order_number.'.pdf';
+
+            return $request->url() === 'https://api.watzap.id/v1/send_file_url'
+                && $body['phone_no'] === '628123456789'
+                && str_contains($body['url'], $filename)
+                && ($body['filename'] ?? '') === $filename
+                && ! isset($body['message']);
         });
     }
 
@@ -229,27 +242,37 @@ class WatzapIntegrationTest extends TestCase
     public function test_signed_pdf_delivery_endpoint_serves_pdf_for_approved_order(): void
     {
         $order = $this->approvedOrder();
+        $filename = 'purchase-order-'.$order->order_number.'.pdf';
 
-        $url = URL::temporarySignedRoute('orders.pdf.delivery', now()->addMinutes(10), ['order' => $order->id]);
+        $url = URL::temporarySignedRoute('orders.pdf.delivery', now()->addMinutes(10), [
+            'order' => $order->id,
+            'filename' => $filename,
+        ]);
 
         $response = $this->get($url);
         $response->assertOk();
         $this->assertStringContainsString('application/pdf', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString($filename, $response->headers->get('Content-Disposition') ?? '');
     }
 
     public function test_unsigned_pdf_delivery_is_forbidden(): void
     {
         $order = $this->approvedOrder();
 
-        $this->get("/delivery/orders/{$order->id}/pdf")->assertForbidden();
+        $this->get("/delivery/orders/{$order->id}/pdf/purchase-order-{$order->order_number}.pdf")
+            ->assertForbidden();
     }
 
     public function test_pdf_delivery_returns_not_found_for_pending_order(): void
     {
         $order = $this->approvedOrder();
+        $filename = 'purchase-order-'.$order->order_number.'.pdf';
         $order->update(['status' => OrderStatus::Pending]);
 
-        $url = URL::temporarySignedRoute('orders.pdf.delivery', now()->addMinutes(10), ['order' => $order->id]);
+        $url = URL::temporarySignedRoute('orders.pdf.delivery', now()->addMinutes(10), [
+            'order' => $order->id,
+            'filename' => $filename,
+        ]);
 
         $this->get($url)->assertNotFound();
     }

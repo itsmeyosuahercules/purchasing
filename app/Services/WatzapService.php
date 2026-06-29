@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\WatzapDeliveryException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -43,7 +44,7 @@ class WatzapService
      *
      * @return array<string, mixed>
      */
-    public function sendFileUrl(string $phoneNo, string $fileUrl, ?string $message = null): array
+    public function sendFileUrl(string $phoneNo, string $fileUrl, ?string $message = null, ?string $filename = null): array
     {
         $payload = [
             'phone_no' => $this->normalizePhone($phoneNo),
@@ -54,14 +55,18 @@ class WatzapService
             $payload['message'] = $message;
         }
 
-        return $this->post('send_file_url', $payload);
+        if ($filename !== null && $filename !== '') {
+            $payload['filename'] = $filename;
+        }
+
+        return $this->post('send_file_url', $payload, (int) config('watzap.file_timeout', 120));
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    private function post(string $endpoint, array $payload): array
+    private function post(string $endpoint, array $payload, ?int $timeout = null): array
     {
         if (! $this->isConfigured()) {
             throw new WatzapDeliveryException('WatZap belum dikonfigurasi (API Key / Number Key kosong).');
@@ -71,11 +76,25 @@ class WatzapService
         $payload['number_key'] = config('watzap.number_key');
 
         $url = config('watzap.base_url').'/'.ltrim($endpoint, '/');
+        $timeout ??= (int) config('watzap.timeout', 30);
 
-        $response = Http::timeout((int) config('watzap.timeout', 30))
-            ->acceptJson()
-            ->asJson()
-            ->post($url, $payload);
+        try {
+            $response = Http::timeout($timeout)
+                ->acceptJson()
+                ->asJson()
+                ->post($url, $payload);
+        } catch (ConnectionException $e) {
+            Log::warning('WatZap API timeout / koneksi gagal', [
+                'endpoint' => $endpoint,
+                'timeout' => $timeout,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new WatzapDeliveryException(
+                'WatZap tidak merespons tepat waktu (timeout '.$timeout.' detik). Pesan/file mungkin tetap terkirim — cek WhatsApp supplier.',
+                null,
+            );
+        }
 
         $body = $response->json() ?? [];
 

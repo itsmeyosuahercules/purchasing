@@ -13,8 +13,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('login'));
 
-Route::get('/delivery/orders/{order}/pdf', [OrderPdfDeliveryController::class, 'show'])
+Route::get('/delivery/orders/{order}/pdf/{filename}', [OrderPdfDeliveryController::class, 'show'])
     ->middleware('signed')
+    ->where('filename', '[^/]+')
     ->name('orders.pdf.delivery');
 
 Route::middleware('guest')->group(function () {

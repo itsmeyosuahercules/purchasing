@@ -10,6 +10,7 @@ class OrderWhatsappDeliveryService
 {
     public function __construct(
         private OrderTemplateService $templateService,
+        private OrderPdfService $pdfService,
         private WatzapService $watzapService,
     ) {}
 
@@ -24,11 +25,12 @@ class OrderWhatsappDeliveryService
     public function signedPdfUrl(Order $order): string
     {
         $ttl = (int) config('watzap.pdf_url_ttl_minutes', 30);
+        $filename = $this->pdfService->filename($order);
 
         return URL::temporarySignedRoute(
             'orders.pdf.delivery',
             now()->addMinutes($ttl),
-            ['order' => $order->id],
+            ['order' => $order->id, 'filename' => $filename],
         );
     }
 
@@ -48,15 +50,24 @@ class OrderWhatsappDeliveryService
         $order->loadMissing('supplier');
 
         $message = $this->templateService->getWhatsappTemplate($order);
+        $phone = $order->supplier->whatsapp;
 
         if ($this->shouldAttachPdf()) {
+            // Teks dulu — send_file_url sering tidak menampilkan caption panjang & lambat.
+            $this->watzapService->sendText($phone, $message);
+
+            $delay = (int) config('watzap.send_delay_seconds', 2);
+            if ($delay > 0) {
+                sleep($delay);
+            }
+
             $this->watzapService->sendFileUrl(
-                $order->supplier->whatsapp,
+                $phone,
                 $this->signedPdfUrl($order),
-                $message,
+                filename: $this->pdfService->filename($order),
             );
         } else {
-            $this->watzapService->sendText($order->supplier->whatsapp, $message);
+            $this->watzapService->sendText($phone, $message);
         }
 
         $order->forceFill([

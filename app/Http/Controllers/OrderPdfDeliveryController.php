@@ -13,15 +13,22 @@ class OrderPdfDeliveryController extends Controller
 
     /**
      * Endpoint publik ber-signature untuk server WatZap mengunduh PDF PO.
+     * Nama file ada di URL agar WatZap tidak menampilkan "pdf" saja.
      */
-    public function show(Order $order): Response
+    public function show(Order $order, string $filename): Response
     {
         if ($order->status !== OrderStatus::Approved) {
             abort(404);
         }
 
+        $expected = $this->pdfService->filename($order);
+
+        if ($filename !== $expected) {
+            abort(404);
+        }
+
         $pdf = $this->pdfService->make($order);
 
-        return $pdf->stream($this->pdfService->filename($order));
+        return $pdf->download($expected);
     }
 }

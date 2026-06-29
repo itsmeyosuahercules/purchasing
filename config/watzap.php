@@ -24,6 +24,10 @@ return [
 
     'timeout' => (int) env('WATZAP_TIMEOUT', 30),
 
+    'file_timeout' => (int) env('WATZAP_FILE_TIMEOUT', 120),
+
+    'send_delay_seconds' => (int) env('WATZAP_SEND_DELAY', 2),
+
     /*
     | Signed URL untuk PDF yang di-fetch server WatZap. APP_URL harus dapat
     | diakses dari internet (bukan localhost) saat production.
