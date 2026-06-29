@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Services\OrderPdfService;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class OrderPdfDeliveryController extends Controller
@@ -13,7 +14,6 @@ class OrderPdfDeliveryController extends Controller
 
     /**
      * Endpoint publik ber-signature untuk server WatZap mengunduh PDF PO.
-     * Nama file ada di URL agar WatZap tidak menampilkan "pdf" saja.
      */
     public function show(Order $order, string $filename): Response
     {
@@ -27,8 +27,24 @@ class OrderPdfDeliveryController extends Controller
             abort(404);
         }
 
-        $pdf = $this->pdfService->make($order);
+        try {
+            $cached = $this->pdfService->downloadFromDeliveryCache($order);
 
-        return $pdf->download($expected);
+            if ($cached !== null) {
+                return $cached;
+            }
+
+            $this->pdfService->ensureDeliveryCache($order);
+
+            return $this->pdfService->downloadFromDeliveryCache($order)
+                ?? $this->pdfService->make($order)->download($expected);
+        } catch (\Throwable $e) {
+            Log::error('Gagal menyajikan PDF untuk WatZap', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            abort(500, 'PDF tidak dapat dibuat.');
+        }
     }
 }

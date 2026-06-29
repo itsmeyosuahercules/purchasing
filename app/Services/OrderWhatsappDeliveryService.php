@@ -53,19 +53,38 @@ class OrderWhatsappDeliveryService
         $phone = $order->supplier->whatsapp;
 
         if ($this->shouldAttachPdf()) {
-            // Teks dulu — send_file_url sering tidak menampilkan caption panjang & lambat.
-            $this->watzapService->sendText($phone, $message);
+            $this->pdfService->ensureDeliveryCache($order);
 
-            $delay = (int) config('watzap.send_delay_seconds', 2);
-            if ($delay > 0) {
-                sleep($delay);
+            $textSent = false;
+
+            try {
+                $this->watzapService->sendText($phone, $message);
+                $textSent = true;
+
+                $delay = (int) config('watzap.send_delay_seconds', 2);
+                if ($delay > 0) {
+                    sleep($delay);
+                }
+
+                $this->watzapService->sendFileUrl(
+                    $phone,
+                    $this->signedPdfUrl($order),
+                    filename: $this->pdfService->filename($order),
+                );
+            } catch (\Throwable $e) {
+                if ($textSent) {
+                    $order->forceFill([
+                        'supplier_whatsapp_sent_at' => now(),
+                        'supplier_whatsapp_error' => mb_substr(
+                            'Teks terkirim, PDF gagal: '.$e->getMessage(),
+                            0,
+                            1000,
+                        ),
+                    ])->save();
+                }
+
+                throw $e;
             }
-
-            $this->watzapService->sendFileUrl(
-                $phone,
-                $this->signedPdfUrl($order),
-                filename: $this->pdfService->filename($order),
-            );
         } else {
             $this->watzapService->sendText($phone, $message);
         }

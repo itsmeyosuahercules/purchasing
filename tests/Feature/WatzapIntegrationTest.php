@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
@@ -237,6 +238,33 @@ class WatzapIntegrationTest extends TestCase
         $order->refresh();
         $this->assertNotNull($order->supplier_whatsapp_sent_at);
         $this->assertNull($order->supplier_whatsapp_error);
+    }
+
+    public function test_resend_whatsapp_rejects_watzap_file_server_error(): void
+    {
+        Http::fake([
+            'https://api.watzap.id/v1/send_message' => Http::response([
+                'status' => '200',
+                'ack' => 'successfully',
+            ]),
+            'https://api.watzap.id/v1/send_file_url' => Http::response([
+                'status' => '1005',
+                'message' => 'Internal Server Error on File Server 500',
+                'ack' => 'fatal_error',
+            ]),
+        ]);
+
+        $order = $this->approvedOrder();
+        $admin = User::where('username', 'admin')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post("/admin/orders/{$order->id}/resend-whatsapp")
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $order->refresh();
+        $this->assertStringContainsString('Teks terkirim', $order->supplier_whatsapp_error ?? '');
+        Storage::disk('local')->assertExists('watzap-delivery/'.$order->id.'/purchase-order-'.$order->order_number.'.pdf');
     }
 
     public function test_signed_pdf_delivery_endpoint_serves_pdf_for_approved_order(): void

@@ -131,11 +131,19 @@ class WatzapService
         if (isset($body['ack'])) {
             $ack = strtolower((string) $body['ack']);
 
+            if (str_contains($ack, 'fatal') || str_contains($ack, 'fail') || str_contains($ack, 'error')) {
+                return false;
+            }
+
             if (str_contains($ack, 'success')) {
                 return true;
             }
+        }
 
-            if (str_contains($ack, 'fail') || str_contains($ack, 'error')) {
+        if (array_key_exists('status', $body)) {
+            $status = (string) $body['status'];
+
+            if (preg_match('/^[1-9]\d{3}$/', $status) && ! in_array($status, ['200'], true)) {
                 return false;
             }
         }
@@ -176,13 +184,22 @@ class WatzapService
      */
     private function extractErrorMessage(array $body, Response $response): string
     {
+        $message = null;
+
         foreach (['message', 'msg', 'error'] as $key) {
             if (! empty($body[$key]) && is_string($body[$key])) {
-                return $body[$key];
+                $message = $body[$key];
+                break;
             }
         }
 
-        return 'WatZap mengembalikan HTTP '.$response->status();
+        $message ??= 'WatZap mengembalikan HTTP '.$response->status();
+
+        if (($body['status'] ?? null) === '1005' || ($body['ack'] ?? null) === 'fatal_error') {
+            $message .= ' — WatZap gagal mengunduh PDF. Buka URL PDF di browser (signed link) untuk cek error server.';
+        }
+
+        return $message;
     }
 
     /**
