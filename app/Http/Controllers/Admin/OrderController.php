@@ -6,7 +6,6 @@ use App\Enums\OrderStatus;
 use App\Http\Requests\UpdateOrderPoRequest;
 use App\Exports\OrdersExport;
 use App\Http\Controllers\Controller;
-use App\Jobs\SendOrderWhatsappJob;
 use App\Models\Order;
 use App\Services\OrderApprovalService;
 use App\Services\OrderPdfService;
@@ -53,11 +52,7 @@ class OrderController extends Controller
     {
         $order->load(['user', 'supplier', 'items', 'approver']);
 
-        $whatsappSending = \Illuminate\Support\Facades\Cache::has(
-            SendOrderWhatsappJob::sendingLockKey($order->id),
-        );
-
-        return view('admin.orders.show', compact('order', 'whatsappSending'));
+        return view('admin.orders.show', compact('order'));
     }
 
     public function approve(Order $order)
@@ -129,7 +124,7 @@ class OrderController extends Controller
         }
 
         return redirect()->route('admin.orders.show', $order)
-            ->with('success', 'WhatsApp sedang dikirim. Tunggu ~10 detik lalu refresh halaman ini.');
+            ->with('success', 'WhatsApp pesanan berhasil dikirim ulang ke supplier.');
     }
 
     public function reject(Request $request, Order $order)

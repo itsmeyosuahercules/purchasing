@@ -3,18 +3,16 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Exceptions\WatzapDeliveryException;
 use App\Jobs\SendOrderWhatsappJob;
 use App\Mail\OrderCopyToAdminMail;
 use App\Mail\OrderToSupplierMail;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\User;
-use App\Services\OrderWhatsappDeliveryService;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Process;
 
 class OrderApprovalService
 {
@@ -39,7 +37,6 @@ class OrderApprovalService
             $whatsappBody,
         );
 
-        // Status di-commit dulu; pengiriman email tidak boleh ikut rollback transaksi.
         DB::transaction(function () use ($order, $admin, $whatsappLink) {
             $validityDays = (int) Setting::get('po_validity_days', 30);
             $deliveryDays = (int) Setting::get('default_delivery_days', 14);
@@ -55,7 +52,7 @@ class OrderApprovalService
         });
 
         $this->dispatchEmails($order, $emailBody);
-        $this->dispatchWhatsapp($order);
+        $this->sendWhatsapp($order);
 
         return $order->fresh(['supplier', 'items', 'user', 'approver']);
     }
@@ -83,13 +80,9 @@ class OrderApprovalService
             throw new \RuntimeException('WatZap belum diaktifkan atau API Key / Number Key belum dikonfigurasi.');
         }
 
-        if ($this->whatsappSendInProgress($order->id)) {
-            throw new \RuntimeException('WhatsApp masih diproses. Tunggu hingga selesai (~1–2 menit) lalu refresh halaman sebelum kirim ulang.');
-        }
-
         $order->forceFill(['supplier_whatsapp_error' => null])->save();
 
-        $this->dispatchWhatsappJob($order->id, force: true);
+        $this->sendWhatsapp($order, force: true);
 
         return $order->fresh(['supplier', 'items', 'user', 'approver']);
     }
@@ -137,58 +130,28 @@ class OrderApprovalService
         }
     }
 
-    private function dispatchWhatsapp(Order $order): void
+    private function sendWhatsapp(Order $order, bool $force = false): void
     {
         if (! $this->whatsappDeliveryService->canDeliver()) {
             return;
         }
 
-        $this->dispatchWhatsappJob($order->id);
-    }
+        $order->loadMissing(['supplier', 'items']);
 
-    private function dispatchWhatsappJob(int $orderId, bool $force = false): void
-    {
-        if ($this->whatsappSendInProgress($orderId)) {
-            Log::info('WhatsApp dilewati: pengiriman sebelumnya masih berjalan', [
-                'order_id' => $orderId,
-            ]);
-
-            return;
-        }
-
-        Cache::put(SendOrderWhatsappJob::sendingLockKey($orderId), now()->toIso8601String(), now()->addMinutes(5));
-
-        Log::info('WhatsApp diproses di background (proses terpisah)', [
-            'order_id' => $orderId,
+        Log::info('WhatsApp kirim sinkron dimulai', [
+            'order_id' => $order->id,
             'force' => $force,
         ]);
 
-        if (app()->runningUnitTests()) {
-            try {
-                (new SendOrderWhatsappJob($orderId, $force))->handle($this->whatsappDeliveryService);
-            } finally {
-                Cache::forget(SendOrderWhatsappJob::sendingLockKey($orderId));
-            }
+        try {
+            (new SendOrderWhatsappJob($order->id, $force))->handle($this->whatsappDeliveryService);
+        } catch (WatzapDeliveryException $e) {
+            Log::error('Gagal mengirim WhatsApp pesanan', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
 
-            return;
+            throw new \RuntimeException('Gagal mengirim WhatsApp: '.$e->getMessage(), 0, $e);
         }
-
-        $command = [
-            PHP_BINARY,
-            base_path('artisan'),
-            'orders:send-whatsapp',
-            (string) $orderId,
-        ];
-
-        if ($force) {
-            $command[] = '--force';
-        }
-
-        Process::path(base_path())->start($command);
-    }
-
-    private function whatsappSendInProgress(int $orderId): bool
-    {
-        return Cache::has(SendOrderWhatsappJob::sendingLockKey($orderId));
     }
 }

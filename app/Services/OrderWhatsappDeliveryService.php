@@ -2,11 +2,8 @@
 
 namespace App\Services;
 
-use App\Jobs\CleanupWatzapDeliveryFileJob;
 use App\Exceptions\WatzapDeliveryException;
 use App\Models\Order;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 
 class OrderWhatsappDeliveryService
@@ -59,17 +56,16 @@ class OrderWhatsappDeliveryService
             $publication = $this->pdfService->publishForWatzap($order);
             $pdfRelativePath = $publication['relative_path'];
             $pdfUrl = $publication['url'];
-            $cleanupScheduled = false;
 
             $textSent = false;
 
             try {
-                $this->verifyPdfUrlAccessible($pdfUrl, $publication['path']);
+                $this->verifyPdfOnDisk($publication['path']);
 
                 $this->watzapService->sendText($phone, $message);
                 $textSent = true;
 
-                $delay = (int) config('watzap.send_delay_seconds', 5);
+                $delay = (int) config('watzap.send_delay_seconds', 3);
                 if ($delay > 0) {
                     sleep($delay);
                 }
@@ -79,11 +75,6 @@ class OrderWhatsappDeliveryService
                     $pdfUrl,
                     filename: $publication['filename'],
                 );
-
-                $cleanupMinutes = max(1, (int) config('watzap.file_cleanup_delay_minutes', 5));
-                CleanupWatzapDeliveryFileJob::dispatch($pdfRelativePath)
-                    ->delay(now()->addMinutes($cleanupMinutes));
-                $cleanupScheduled = true;
             } catch (\Throwable $e) {
                 if ($textSent) {
                     $order->forceFill([
@@ -98,9 +89,7 @@ class OrderWhatsappDeliveryService
 
                 throw $e;
             } finally {
-                if (! $cleanupScheduled) {
-                    $this->pdfService->cleanupWatzapPublication($pdfRelativePath);
-                }
+                $this->pdfService->cleanupWatzapPublication($pdfRelativePath);
             }
         } else {
             $this->watzapService->sendText($phone, $message);
@@ -148,55 +137,10 @@ class OrderWhatsappDeliveryService
             && ! str_ends_with($host, '.localhost');
     }
 
-    /**
-     * Pastikan PDF benar-benar bisa di-fetch sebelum WatZap mencoba (cegah error 1005).
-     */
-    private function verifyPdfUrlAccessible(string $pdfUrl, string $absolutePath): void
+    private function verifyPdfOnDisk(string $absolutePath): void
     {
         if (! is_file($absolutePath) || filesize($absolutePath) < 100) {
             throw new WatzapDeliveryException('File PDF tidak ada atau rusak di server.');
-        }
-
-        if (app()->runningUnitTests()) {
-            return;
-        }
-
-        try {
-            $response = Http::timeout(10)
-                ->withOptions(['allow_redirects' => true])
-                ->head($pdfUrl);
-        } catch (\Throwable $e) {
-            Log::warning('Self-check URL PDF WatZap gagal', [
-                'url' => $pdfUrl,
-                'message' => $e->getMessage(),
-            ]);
-
-            throw new WatzapDeliveryException(
-                'PDF tidak dapat diakses dari URL publik ('.$pdfUrl.'): '.$e->getMessage()
-                .'. Periksa APP_URL dan izin folder public/watzap-delivery.',
-            );
-        }
-
-        if (! $response->successful()) {
-            throw new WatzapDeliveryException(
-                'PDF URL mengembalikan HTTP '.$response->status()
-                .'. Buka '.$pdfUrl.' di browser untuk diagnosa.',
-            );
-        }
-
-        $contentLength = (int) ($response->header('Content-Length') ?? 0);
-        $contentType = strtolower((string) ($response->header('Content-Type') ?? ''));
-
-        if ($contentLength > 0 && $contentLength < 100) {
-            throw new WatzapDeliveryException(
-                'PDF URL mengembalikan file terlalu kecil. Kemungkinan APP_URL salah atau server memblokir akses eksternal.',
-            );
-        }
-
-        if ($contentType !== '' && ! str_contains($contentType, 'pdf')) {
-            throw new WatzapDeliveryException(
-                'PDF URL tidak mengembalikan Content-Type PDF. Kemungkinan halaman error HTML.',
-            );
         }
     }
 }

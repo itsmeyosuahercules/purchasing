@@ -5,22 +5,18 @@ namespace App\Console\Commands;
 use App\Jobs\SendOrderWhatsappJob;
 use App\Services\OrderWhatsappDeliveryService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class SendOrderWhatsappCommand extends Command
 {
     protected $signature = 'orders:send-whatsapp {orderId : ID pesanan} {--force : Kirim ulang meski sudah pernah terkirim}';
 
-    protected $description = 'Kirim WhatsApp PO ke supplier (proses terpisah dari request web)';
+    protected $description = 'Kirim WhatsApp PO ke supplier (manual / debug)';
 
     public function handle(OrderWhatsappDeliveryService $deliveryService): int
     {
         $orderId = (int) $this->argument('orderId');
         $force = (bool) $this->option('force');
-        $lockKey = SendOrderWhatsappJob::sendingLockKey($orderId);
-
-        set_time_limit((int) config('watzap.file_timeout', 120) + 120);
 
         try {
             (new SendOrderWhatsappJob($orderId, $force))->handle($deliveryService);
@@ -30,10 +26,12 @@ class SendOrderWhatsappCommand extends Command
                 'message' => $e->getMessage(),
             ]);
 
+            $this->error($e->getMessage());
+
             return self::FAILURE;
-        } finally {
-            Cache::forget($lockKey);
         }
+
+        $this->info('Selesai. Cek log dan status pesanan.');
 
         return self::SUCCESS;
     }

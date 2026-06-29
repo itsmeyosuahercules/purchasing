@@ -8,7 +8,7 @@ use App\Services\OrderWhatsappDeliveryService;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Bukan queue job — dijalankan via artisan orders:send-whatsapp (proses PHP terpisah).
+ * Runner pengiriman WhatsApp — dipanggil langsung (sinkron) dari web request.
  */
 class SendOrderWhatsappJob
 {
@@ -17,13 +17,10 @@ class SendOrderWhatsappJob
         public bool $force = false,
     ) {}
 
-    public static function sendingLockKey(int $orderId): string
-    {
-        return 'watzap-sending:'.$orderId;
-    }
-
     public function handle(OrderWhatsappDeliveryService $deliveryService): void
     {
+        set_time_limit((int) config('watzap.file_timeout', 90) + 60);
+
         Log::info('WhatsApp job mulai', [
             'order_id' => $this->orderId,
             'force' => $this->force,

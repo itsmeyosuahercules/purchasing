@@ -101,11 +101,9 @@
                                 <p class="text-xs text-slate-400 mt-0.5">
                                     {{ $order->supplier_emailed_at ? 'Email terkirim '.$order->supplier_emailed_at->format('d/m/Y H:i') : 'Email belum terkirim' }}
                                 </p>
-                                <p class="text-xs {{ $order->supplier_whatsapp_error ? 'text-red-500' : ($whatsappSending ? 'text-amber-600' : 'text-slate-400') }} mt-0.5">
+                                <p class="text-xs {{ $order->supplier_whatsapp_error ? 'text-red-500' : 'text-slate-400' }} mt-0.5">
                                     @if(! config('watzap.enabled'))
                                         WhatsApp API nonaktif (WATZAP_ENABLED=false)
-                                    @elseif($whatsappSending ?? false)
-                                        WhatsApp sedang dikirim… tunggu ~1–2 menit lalu refresh
                                     @elseif($order->supplier_whatsapp_sent_at)
                                         WhatsApp terkirim {{ $order->supplier_whatsapp_sent_at->format('d/m/Y H:i') }}
                                     @elseif($order->supplier_whatsapp_error)
@@ -126,12 +124,13 @@
                                 </x-button>
                             </form>
                             <form method="POST" action="{{ route('admin.orders.resend-whatsapp', $order) }}"
-                                  onsubmit="this.querySelector('button[type=submit]')?.setAttribute('disabled', 'disabled'); return confirm('Kirim{{ $order->supplier_whatsapp_sent_at ? ' ulang' : '' }} WhatsApp ke supplier?')">
+                                  onsubmit="if(confirm('Kirim{{ $order->supplier_whatsapp_sent_at ? ' ulang' : '' }} WhatsApp ke supplier?')){ this.querySelector('button[type=submit]').disabled=true; this.querySelector('[data-wa-loading]')?.classList.remove('hidden'); return true;} return false;">
                                 @csrf
                                 <x-button type="submit" :variant="$order->supplier_whatsapp_sent_at ? 'secondary' : 'primary'">
                                     <x-icon name="whatsapp" class="w-4 h-4" />
-                                    {{ $order->supplier_whatsapp_sent_at ? 'Kirim Ulang WhatsApp' : 'Kirim WhatsApp' }}
+                                    <span>{{ $order->supplier_whatsapp_sent_at ? 'Kirim Ulang WhatsApp' : 'Kirim WhatsApp' }}</span>
                                 </x-button>
+                                <span data-wa-loading class="hidden text-sm text-amber-600 ml-2">Mengirim… jangan tutup halaman</span>
                             </form>
                             @if($order->whatsapp_link)
                                 <x-button :href="$order->whatsapp_link" variant="secondary" target="_blank" rel="noopener">
