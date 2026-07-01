@@ -9,9 +9,14 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Employee\OrderController as EmployeeOrderController;
 use App\Http\Controllers\OrderPdfDeliveryController;
+use App\Http\Controllers\PoDownloadController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('login'));
+
+Route::get('/po/{token}', [PoDownloadController::class, 'show'])
+    ->where('token', '[a-z0-9]{8,12}')
+    ->name('orders.po.download');
 
 Route::get('/delivery/orders/{order}/pdf/{filename}', [OrderPdfDeliveryController::class, 'show'])
     ->middleware('signed')

@@ -153,9 +153,8 @@ class WatzapIntegrationTest extends TestCase
 
             return $request->url() === 'https://api.watzap.id/v1/send_message'
                 && str_contains($body['message'], 'PT Supplier')
-                && str_contains($body['message'], 'Unduh Purchase Order')
-                && str_contains($body['message'], '/delivery/orders/')
-                && str_contains($body['message'], 'signature=');
+                && str_contains($body['message'], '/po/')
+                && str_contains($body['message'], 'PO-WA-0001');
         });
 
         Http::assertNotSent(fn ($request) => $request->url() === 'https://api.watzap.id/v1/send_file_url');
@@ -222,6 +221,18 @@ class WatzapIntegrationTest extends TestCase
             return $request->url() === 'https://api.watzap.id/v1/send_file_url'
                 && ! isset($body['message']);
         });
+    }
+
+    public function test_short_po_download_link_serves_pdf(): void
+    {
+        $order = $this->approvedOrder();
+        $url = app(\App\Services\OrderPdfService::class)->createShortDownloadUrl($order);
+        $token = basename(parse_url($url, PHP_URL_PATH));
+
+        $response = $this->get('/po/'.$token);
+        $response->assertOk();
+        $this->assertStringContainsString('application/pdf', $response->headers->get('Content-Type') ?? '');
+        $this->assertStringContainsString('purchase-order-'.$order->order_number.'.pdf', $response->headers->get('Content-Disposition') ?? '');
     }
 
     public function test_local_mode_sends_text_only_without_pdf_url(): void

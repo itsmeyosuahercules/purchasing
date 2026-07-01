@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Exceptions\WatzapDeliveryException;
 use App\Models\Order;
-use Illuminate\Support\Facades\URL;
 
 class OrderWhatsappDeliveryService
 {
@@ -19,27 +18,25 @@ class OrderWhatsappDeliveryService
         return (bool) config('watzap.enabled') && $this->watzapService->isConfigured();
     }
 
-    public function signedPdfDownloadUrl(Order $order): string
+    public function shortPdfDownloadUrl(Order $order): string
     {
-        $ttlMinutes = $this->usesLinkSendMode()
-            ? max(60, (int) config('watzap.pdf_link_ttl_days', 7) * 24 * 60)
-            : (int) config('watzap.pdf_url_ttl_minutes', 30);
-
-        $filename = $this->pdfService->filename($order);
-
-        return URL::temporarySignedRoute(
-            'orders.pdf.delivery',
-            now()->addMinutes($ttlMinutes),
-            ['order' => $order->id, 'filename' => $filename],
-        );
+        return $this->pdfService->createShortDownloadUrl($order);
     }
 
     /**
-     * @deprecated Gunakan signedPdfDownloadUrl()
+     * @deprecated Gunakan shortPdfDownloadUrl()
+     */
+    public function signedPdfDownloadUrl(Order $order): string
+    {
+        return $this->shortPdfDownloadUrl($order);
+    }
+
+    /**
+     * @deprecated Gunakan shortPdfDownloadUrl()
      */
     public function signedPdfUrl(Order $order): string
     {
-        return $this->signedPdfDownloadUrl($order);
+        return $this->shortPdfDownloadUrl($order);
     }
 
     public function sendToSupplier(Order $order): void
@@ -79,12 +76,12 @@ class OrderWhatsappDeliveryService
      */
     private function sendWithPdfDownloadLink(Order $order, string $phone): void
     {
-        $this->pdfService->ensureDeliveryCache($order);
-        $downloadUrl = $this->signedPdfDownloadUrl($order);
+        $downloadUrl = $this->shortPdfDownloadUrl($order);
         $message = $this->templateService->getWhatsappTemplate($order, $downloadUrl);
 
         if (! str_contains($message, $downloadUrl)) {
-            $message = rtrim($message)."\n\nUnduh Purchase Order (PDF):\n".$downloadUrl;
+            $days = (int) config('watzap.pdf_link_ttl_days', 7);
+            $message = rtrim($message)."\n\nUnduh PO {$order->order_number}:\n{$downloadUrl}\n(Link aktif {$days} hari)";
         }
 
         $this->watzapService->sendText($phone, $message);

@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Support\RupiahTerbilang;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdfDocument;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -86,6 +87,43 @@ class OrderPdfService
             $this->filename($order),
             ['Content-Type' => 'application/pdf'],
         );
+    }
+
+    /**
+     * Buat link pendek /po/{token} untuk unduh PDF via WhatsApp.
+     */
+    public function createShortDownloadUrl(Order $order): string
+    {
+        $this->ensureDeliveryCache($order);
+
+        $token = strtolower(Str::random(10));
+        $days = max(1, (int) config('watzap.pdf_link_ttl_days', 7));
+
+        Cache::put($this->downloadTokenCacheKey($token), $order->id, now()->addDays($days));
+
+        return rtrim((string) config('app.url'), '/').'/po/'.$token;
+    }
+
+    public function findOrderByDownloadToken(string $token): ?Order
+    {
+        $token = strtolower($token);
+
+        if (! preg_match('/^[a-z0-9]{8,12}$/', $token)) {
+            return null;
+        }
+
+        $orderId = Cache::get($this->downloadTokenCacheKey($token));
+
+        if (! $orderId) {
+            return null;
+        }
+
+        return Order::query()->find($orderId);
+    }
+
+    private function downloadTokenCacheKey(string $token): string
+    {
+        return 'po-download:'.strtolower($token);
     }
 
     /**
