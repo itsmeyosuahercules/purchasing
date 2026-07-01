@@ -14,7 +14,7 @@ class OrderTemplateService
         $days = (int) config('watzap.pdf_link_ttl_days', 7);
 
         $pdfLine = $pdfDownloadLink
-            ? "Unduh PO {$order->order_number}:\n{$pdfDownloadLink}\n(Link aktif {$days} hari)"
+            ? "Unduh {$order->order_number}:\n{$pdfDownloadLink}\n(Link aktif {$days} hari)"
             : '';
 
         $replacements = [
