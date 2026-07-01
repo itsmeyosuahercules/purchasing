@@ -195,8 +195,16 @@ class WatzapService
 
         $message ??= 'WatZap mengembalikan HTTP '.$response->status();
 
+        $lower = strtolower($message);
+
+        if (str_contains($lower, 'license')) {
+            return $message.' — Cek app.watzap.id: nomor WA harus terhubung & lisensi aktif (paket Plus/Premium untuk API). Coba reconnect di dashboard.';
+        }
+
         if (($body['status'] ?? null) === '1005' || ($body['ack'] ?? null) === 'fatal_error') {
-            $message .= ' — WatZap gagal mengunduh PDF. Pastikan APP_URL benar dan file di public/watzap-delivery dapat diakses publik (HTTPS).';
+            if (! str_contains($lower, 'license')) {
+                $message .= ' — WatZap gagal mengunduh PDF. Pastikan APP_URL benar dan folder public/watzap-delivery dapat diakses publik (HTTPS).';
+            }
         }
 
         return $message;

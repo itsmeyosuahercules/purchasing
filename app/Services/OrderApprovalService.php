@@ -151,7 +151,7 @@ class OrderApprovalService
                 'message' => $e->getMessage(),
             ]);
 
-            throw new \RuntimeException('Gagal mengirim WhatsApp: '.$e->getMessage(), 0, $e);
+            throw new \RuntimeException($e->getMessage(), 0, $e);
         }
     }
 }
