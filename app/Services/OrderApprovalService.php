@@ -10,6 +10,7 @@ use App\Mail\OrderToSupplierMail;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -80,6 +81,10 @@ class OrderApprovalService
             throw new \RuntimeException('WatZap belum diaktifkan atau API Key / Number Key belum dikonfigurasi.');
         }
 
+        if ($this->whatsappSendInProgress($order->id)) {
+            throw new \RuntimeException('WhatsApp masih diproses. Jangan klik ulang — tunggu halaman selesai loading.');
+        }
+
         $order->forceFill(['supplier_whatsapp_error' => null])->save();
 
         $this->sendWhatsapp($order, force: true);
@@ -138,6 +143,14 @@ class OrderApprovalService
 
         $order->loadMissing(['supplier', 'items']);
 
+        $lockKey = 'watzap-sending:'.$order->id;
+
+        if (Cache::has($lockKey)) {
+            throw new \RuntimeException('WhatsApp masih diproses. Jangan klik ulang — tunggu halaman selesai loading.');
+        }
+
+        Cache::put($lockKey, true, now()->addMinutes(3));
+
         Log::info('WhatsApp kirim sinkron dimulai', [
             'order_id' => $order->id,
             'force' => $force,
@@ -152,6 +165,13 @@ class OrderApprovalService
             ]);
 
             throw new \RuntimeException($e->getMessage(), 0, $e);
+        } finally {
+            Cache::forget($lockKey);
         }
+    }
+
+    private function whatsappSendInProgress(int $orderId): bool
+    {
+        return Cache::has('watzap-sending:'.$orderId);
     }
 }

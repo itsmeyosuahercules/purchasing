@@ -130,10 +130,6 @@ class WatzapIntegrationTest extends TestCase
     public function test_resend_whatsapp_calls_watzap_api_with_pdf_url(): void
     {
         Http::fake([
-            'https://api.watzap.id/v1/send_message' => Http::response([
-                'status' => true,
-                'message' => 'success',
-            ]),
             'https://api.watzap.id/v1/send_file_url' => Http::response([
                 'status' => true,
                 'message' => 'success',
@@ -152,13 +148,6 @@ class WatzapIntegrationTest extends TestCase
         $this->assertNotNull($order->supplier_whatsapp_sent_at);
         $this->assertNull($order->supplier_whatsapp_error);
 
-        Http::assertSent(function ($request) {
-            $body = $request->data();
-
-            return $request->url() === 'https://api.watzap.id/v1/send_message'
-                && str_contains($body['message'], 'PT Supplier');
-        });
-
         Http::assertSent(function ($request) use ($order) {
             $body = $request->data();
             $filename = 'purchase-order-'.$order->order_number.'.pdf';
@@ -167,6 +156,40 @@ class WatzapIntegrationTest extends TestCase
                 && $body['phone_no'] === '628123456789'
                 && str_ends_with($body['url'], '/'.$filename)
                 && ($body['filename'] ?? '') === $filename
+                && str_contains($body['message'] ?? '', 'PT Supplier');
+        });
+
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://api.watzap.id/v1/send_message');
+    }
+
+    public function test_separate_mode_sends_text_then_pdf(): void
+    {
+        config(['watzap.send_mode' => 'separate']);
+
+        Http::fake([
+            'https://api.watzap.id/v1/send_message' => Http::response([
+                'status' => true,
+                'message' => 'success',
+            ]),
+            'https://api.watzap.id/v1/send_file_url' => Http::response([
+                'status' => true,
+                'message' => 'success',
+            ]),
+        ]);
+
+        $order = $this->approvedOrder();
+        $admin = User::where('username', 'admin')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post("/admin/orders/{$order->id}/resend-whatsapp")
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.watzap.id/v1/send_message');
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return $request->url() === 'https://api.watzap.id/v1/send_file_url'
                 && ! isset($body['message']);
         });
     }
@@ -292,6 +315,8 @@ class WatzapIntegrationTest extends TestCase
 
     public function test_resend_whatsapp_rejects_watzap_file_server_error(): void
     {
+        config(['watzap.send_mode' => 'separate']);
+
         Http::fake([
             'https://api.watzap.id/v1/send_message' => Http::response([
                 'status' => '200',

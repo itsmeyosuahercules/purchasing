@@ -29,6 +29,12 @@ return [
     'send_delay_seconds' => (int) env('WATZAP_SEND_DELAY', 3),
 
     /*
+    | combined = 1x API (PDF + caption teks) — lebih cepat, 1 bubble WA
+    | separate = teks dulu, lalu PDF — 2 bubble, lebih lambat
+    */
+    'send_mode' => env('WATZAP_SEND_MODE', 'combined'),
+
+    /*
     | Signed URL untuk PDF yang di-fetch server WatZap. APP_URL harus dapat
     | diakses dari internet (bukan localhost) saat production.
     */

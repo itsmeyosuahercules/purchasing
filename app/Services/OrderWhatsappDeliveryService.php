@@ -53,15 +53,36 @@ class OrderWhatsappDeliveryService
         $phone = $order->supplier->whatsapp;
 
         if ($this->shouldAttachPdf()) {
-            $publication = $this->pdfService->publishForWatzap($order);
-            $pdfRelativePath = $publication['relative_path'];
-            $pdfUrl = $publication['url'];
+            $this->sendWithPdf($order, $phone, $message);
+        } else {
+            $this->watzapService->sendText($phone, $message);
+        }
 
-            $textSent = false;
+        $order->forceFill([
+            'supplier_whatsapp_sent_at' => now(),
+            'supplier_whatsapp_error' => null,
+        ])->save();
+    }
 
-            try {
-                $this->verifyPdfOnDisk($publication['path']);
+    private function sendWithPdf(Order $order, string $phone, string $message): void
+    {
+        $publication = $this->pdfService->publishForWatzap($order);
+        $pdfRelativePath = $publication['relative_path'];
+        $pdfUrl = $publication['url'];
 
+        $textSent = false;
+
+        try {
+            $this->verifyPdfOnDisk($publication['path']);
+
+            if ($this->usesCombinedSendMode()) {
+                $this->watzapService->sendFileUrl(
+                    $phone,
+                    $pdfUrl,
+                    message: $message,
+                    filename: $publication['filename'],
+                );
+            } else {
                 $this->watzapService->sendText($phone, $message);
                 $textSent = true;
 
@@ -75,30 +96,46 @@ class OrderWhatsappDeliveryService
                     $pdfUrl,
                     filename: $publication['filename'],
                 );
-            } catch (\Throwable $e) {
-                if ($textSent) {
-                    $order->forceFill([
-                        'supplier_whatsapp_sent_at' => now(),
-                        'supplier_whatsapp_error' => mb_substr(
-                            'Teks terkirim, PDF gagal: '.$e->getMessage(),
-                            0,
-                            1000,
-                        ),
-                    ])->save();
-                }
-
-                throw $e;
-            } finally {
-                $this->pdfService->cleanupWatzapPublication($pdfRelativePath);
             }
-        } else {
-            $this->watzapService->sendText($phone, $message);
-        }
+        } catch (\Throwable $e) {
+            if ($textSent) {
+                $order->forceFill([
+                    'supplier_whatsapp_sent_at' => now(),
+                    'supplier_whatsapp_error' => mb_substr(
+                        'Teks terkirim, PDF gagal: '.$e->getMessage(),
+                        0,
+                        1000,
+                    ),
+                ])->save();
+            } elseif ($this->isTimeoutException($e)) {
+                $order->forceFill([
+                    'supplier_whatsapp_sent_at' => now(),
+                    'supplier_whatsapp_error' => mb_substr(
+                        'WatZap timeout — pesan/PDF mungkin sudah terkirim. Cek WhatsApp supplier sebelum kirim ulang.',
+                        0,
+                        1000,
+                    ),
+                ])->save();
 
-        $order->forceFill([
-            'supplier_whatsapp_sent_at' => now(),
-            'supplier_whatsapp_error' => null,
-        ])->save();
+                return;
+            }
+
+            throw $e;
+        } finally {
+            $this->pdfService->cleanupWatzapPublication($pdfRelativePath);
+        }
+    }
+
+    private function usesCombinedSendMode(): bool
+    {
+        return strtolower((string) config('watzap.send_mode', 'combined')) !== 'separate';
+    }
+
+    private function isTimeoutException(\Throwable $e): bool
+    {
+        $msg = strtolower($e->getMessage());
+
+        return str_contains($msg, 'timeout') || str_contains($msg, 'timed out');
     }
 
     /**
