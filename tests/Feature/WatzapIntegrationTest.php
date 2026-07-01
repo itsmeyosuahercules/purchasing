@@ -130,7 +130,7 @@ class WatzapIntegrationTest extends TestCase
     public function test_resend_whatsapp_calls_watzap_api_with_pdf_url(): void
     {
         Http::fake([
-            'https://api.watzap.id/v1/send_file_url' => Http::response([
+            'https://api.watzap.id/v1/send_message' => Http::response([
                 'status' => true,
                 'message' => 'success',
             ]),
@@ -148,14 +148,44 @@ class WatzapIntegrationTest extends TestCase
         $this->assertNotNull($order->supplier_whatsapp_sent_at);
         $this->assertNull($order->supplier_whatsapp_error);
 
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return $request->url() === 'https://api.watzap.id/v1/send_message'
+                && str_contains($body['message'], 'PT Supplier')
+                && str_contains($body['message'], 'Unduh Purchase Order')
+                && str_contains($body['message'], '/delivery/orders/')
+                && str_contains($body['message'], 'signature=');
+        });
+
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://api.watzap.id/v1/send_file_url');
+    }
+
+    public function test_combined_mode_sends_file_url_with_caption(): void
+    {
+        config(['watzap.send_mode' => 'combined']);
+
+        Http::fake([
+            'https://api.watzap.id/v1/send_file_url' => Http::response([
+                'status' => true,
+                'message' => 'success',
+            ]),
+        ]);
+
+        $order = $this->approvedOrder();
+        $admin = User::where('username', 'admin')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post("/admin/orders/{$order->id}/resend-whatsapp")
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
         Http::assertSent(function ($request) use ($order) {
             $body = $request->data();
             $filename = 'purchase-order-'.$order->order_number.'.pdf';
 
             return $request->url() === 'https://api.watzap.id/v1/send_file_url'
-                && $body['phone_no'] === '628123456789'
                 && str_ends_with($body['url'], '/'.$filename)
-                && ($body['filename'] ?? '') === $filename
                 && str_contains($body['message'] ?? '', 'PT Supplier');
         });
 

@@ -19,24 +19,29 @@ class OrderWhatsappDeliveryService
         return (bool) config('watzap.enabled') && $this->watzapService->isConfigured();
     }
 
-    /**
-     * URL signed sementara agar server WatZap bisa mengunduh PDF tanpa login.
-     */
-    public function signedPdfUrl(Order $order): string
+    public function signedPdfDownloadUrl(Order $order): string
     {
-        $ttl = (int) config('watzap.pdf_url_ttl_minutes', 30);
+        $ttlMinutes = $this->usesLinkSendMode()
+            ? max(60, (int) config('watzap.pdf_link_ttl_days', 7) * 24 * 60)
+            : (int) config('watzap.pdf_url_ttl_minutes', 30);
+
         $filename = $this->pdfService->filename($order);
 
         return URL::temporarySignedRoute(
             'orders.pdf.delivery',
-            now()->addMinutes($ttl),
+            now()->addMinutes($ttlMinutes),
             ['order' => $order->id, 'filename' => $filename],
         );
     }
 
     /**
-     * Kirim template WhatsApp + lampiran PDF ke supplier.
+     * @deprecated Gunakan signedPdfDownloadUrl()
      */
+    public function signedPdfUrl(Order $order): string
+    {
+        return $this->signedPdfDownloadUrl($order);
+    }
+
     public function sendToSupplier(Order $order): void
     {
         if (! $this->canDeliver()) {
@@ -49,12 +54,17 @@ class OrderWhatsappDeliveryService
 
         $order->loadMissing('supplier');
 
-        $message = $this->templateService->getWhatsappTemplate($order);
         $phone = $order->supplier->whatsapp;
 
         if ($this->shouldAttachPdf()) {
-            $this->sendWithPdf($order, $phone, $message);
+            if ($this->usesLinkSendMode()) {
+                $this->sendWithPdfDownloadLink($order, $phone);
+            } else {
+                $message = $this->templateService->getWhatsappTemplate($order);
+                $this->sendWithPdfAttachment($order, $phone, $message);
+            }
         } else {
+            $message = $this->templateService->getWhatsappTemplate($order);
             $this->watzapService->sendText($phone, $message);
         }
 
@@ -64,7 +74,26 @@ class OrderWhatsappDeliveryService
         ])->save();
     }
 
-    private function sendWithPdf(Order $order, string $phone, string $message): void
+    /**
+     * Mode link: 1x send_message dengan URL unduh PDF (auto-download saat diklik).
+     */
+    private function sendWithPdfDownloadLink(Order $order, string $phone): void
+    {
+        $this->pdfService->ensureDeliveryCache($order);
+        $downloadUrl = $this->signedPdfDownloadUrl($order);
+        $message = $this->templateService->getWhatsappTemplate($order, $downloadUrl);
+
+        if (! str_contains($message, $downloadUrl)) {
+            $message = rtrim($message)."\n\nUnduh Purchase Order (PDF):\n".$downloadUrl;
+        }
+
+        $this->watzapService->sendText($phone, $message);
+    }
+
+    /**
+     * Mode combined/separate: WatZap fetch PDF via send_file_url (lambat).
+     */
+    private function sendWithPdfAttachment(Order $order, string $phone, string $message): void
     {
         $publication = $this->pdfService->publishForWatzap($order);
         $pdfRelativePath = $publication['relative_path'];
@@ -126,9 +155,14 @@ class OrderWhatsappDeliveryService
         }
     }
 
+    private function usesLinkSendMode(): bool
+    {
+        return strtolower((string) config('watzap.send_mode', 'link')) === 'link';
+    }
+
     private function usesCombinedSendMode(): bool
     {
-        return strtolower((string) config('watzap.send_mode', 'combined')) !== 'separate';
+        return strtolower((string) config('watzap.send_mode', 'link')) === 'combined';
     }
 
     private function isTimeoutException(\Throwable $e): bool
@@ -138,9 +172,6 @@ class OrderWhatsappDeliveryService
         return str_contains($msg, 'timeout') || str_contains($msg, 'timed out');
     }
 
-    /**
-     * WatZap hanya bisa fetch file dari URL HTTPS publik (bukan localhost / .test).
-     */
     public function shouldAttachPdf(): bool
     {
         $configured = config('watzap.attach_pdf');

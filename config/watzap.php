@@ -29,10 +29,16 @@ return [
     'send_delay_seconds' => (int) env('WATZAP_SEND_DELAY', 3),
 
     /*
-    | combined = 1x API (PDF + caption teks) — lebih cepat, 1 bubble WA
-    | separate = teks dulu, lalu PDF — 2 bubble, lebih lambat
+    | link     = teks + link unduh PDF (cepat ~3 detik, supplier klik untuk download)
+    | combined = 1x API lampiran PDF + caption
+    | separate = teks dulu, lalu PDF — paling lambat
     */
-    'send_mode' => env('WATZAP_SEND_MODE', 'combined'),
+    'send_mode' => env('WATZAP_SEND_MODE', 'link'),
+
+    /*
+    | Masa berlaku link unduh PDF di mode link (hari).
+    */
+    'pdf_link_ttl_days' => (int) env('WATZAP_PDF_LINK_TTL_DAYS', 7),
 
     /*
     | Signed URL untuk PDF yang di-fetch server WatZap. APP_URL harus dapat

@@ -42,7 +42,7 @@
                 <x-textarea name="default_email_template" label="Template Email" rows="6" :value="$settings['default_email_template']"
                             hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list}" />
                 <x-textarea name="default_whatsapp_template" label="Template WhatsApp" rows="6" :value="$settings['default_whatsapp_template']"
-                            hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list_no_price}" />
+                            hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list_no_price}, {pdf_download_link} (wajib untuk mode link WA)" />
             </div>
         </x-card>
 

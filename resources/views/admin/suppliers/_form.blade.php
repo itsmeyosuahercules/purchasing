@@ -24,7 +24,7 @@
             <x-textarea name="email_template" label="Template Email" :value="$supplier?->email_template"
                         hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list}" />
             <x-textarea name="whatsapp_template" label="Template WhatsApp" :value="$supplier?->whatsapp_template"
-                        hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list_no_price}" />
+                        hint="Kosongkan = pakai default Pengaturan. Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list_no_price}, {pdf_download_link} (link unduh PDF — mode link)" />
         </div>
     </x-card>
 
