@@ -58,13 +58,28 @@ class OrderController extends Controller
     public function approve(Order $order)
     {
         try {
-            $this->approvalService->approve($order, auth()->user());
+            $order = $this->approvalService->approve($order, auth()->user());
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('admin.orders.show', $order)
-            ->with('success', 'Pesanan disetujui. Email + WhatsApp (jika aktif) dikirim ke supplier.');
+        $emailSent = $order->supplier_emailed_at !== null;
+        $whatsappSent = $order->supplier_whatsapp_sent_at !== null;
+
+        if ($emailSent && $whatsappSent) {
+            $message = 'Pesanan disetujui. Email dan WhatsApp terkirim ke supplier.';
+        } elseif ($emailSent) {
+            $message = 'Pesanan disetujui. Email terkirim ke supplier.'
+                .(config('watzap.enabled') ? ' WhatsApp tidak terkirim — cek status di bawah.' : '');
+        } elseif ($whatsappSent) {
+            return redirect()->route('admin.orders.show', $order)
+                ->with('warning', 'Pesanan disetujui. WhatsApp terkirim, tapi email gagal — klik "Kirim Email" di bawah.');
+        } else {
+            return redirect()->route('admin.orders.show', $order)
+                ->with('warning', 'Pesanan disetujui, tapi email dan WhatsApp gagal dikirim. Coba kirim ulang di bawah.');
+        }
+
+        return redirect()->route('admin.orders.show', $order)->with('success', $message);
     }
 
     public function pdfPreview(Order $order)

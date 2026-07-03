@@ -46,9 +46,11 @@ class OrderToSupplierMail extends Mailable
     private function pdfAttachment(): Attachment
     {
         $service = app(OrderPdfService::class);
+        $service->ensureDeliveryCache($this->order);
 
-        return Attachment::fromData(
-            fn () => $service->make($this->order)->output(),
+        return Attachment::fromStorageDisk(
+            'local',
+            $service->deliveryCachePath($this->order),
             $service->filename($this->order),
         )->withMime('application/pdf');
     }

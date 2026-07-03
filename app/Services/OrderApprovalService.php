@@ -21,6 +21,7 @@ class OrderApprovalService
         private OrderTemplateService $templateService,
         private WhatsappLinkService $whatsappLinkService,
         private OrderWhatsappDeliveryService $whatsappDeliveryService,
+        private OrderPdfService $pdfService,
     ) {}
 
     public function approve(Order $order, User $admin): Order
@@ -29,9 +30,10 @@ class OrderApprovalService
             throw new \RuntimeException('Pesanan ini sudah diproses.');
         }
 
+        $this->extendExecutionTime();
+
         $order->load(['supplier', 'items', 'user']);
 
-        $emailBody = $this->templateService->getEmailTemplate($order);
         $whatsappBody = $this->templateService->getWhatsappTemplate($order);
         $whatsappLink = $this->whatsappLinkService->generate(
             $order->supplier->whatsapp,
@@ -52,6 +54,11 @@ class OrderApprovalService
             ]);
         });
 
+        $order->refresh()->load(['supplier', 'items', 'user', 'approver']);
+
+        $emailBody = $this->templateService->getEmailTemplate($order);
+        $this->pdfService->ensureDeliveryCache($order);
+
         $this->dispatchEmails($order, $emailBody);
         $this->sendWhatsapp($order);
 
@@ -64,7 +71,10 @@ class OrderApprovalService
             throw new \RuntimeException('Email hanya bisa dikirim ulang untuk pesanan yang sudah disetujui.');
         }
 
-        $order->load(['supplier', 'items', 'user']);
+        $this->extendExecutionTime();
+
+        $order->load(['supplier', 'items', 'user', 'approver']);
+        $this->pdfService->ensureDeliveryCache($order);
         $emailBody = $this->templateService->getEmailTemplate($order);
         $this->dispatchEmails($order, $emailBody, rethrow: true);
 
@@ -110,19 +120,28 @@ class OrderApprovalService
 
     private function dispatchEmails(Order $order, string $emailBody, bool $rethrow = false): bool
     {
-        try {
-            Mail::to($order->supplier->email)->send(new OrderToSupplierMail($order, $emailBody));
+        $supplierEmail = trim((string) $order->supplier->email);
 
-            $adminEmail = Setting::get('admin_email');
-            if ($adminEmail) {
-                Mail::to($adminEmail)->send(new OrderCopyToAdminMail($order, $emailBody));
+        if ($supplierEmail === '') {
+            $message = 'Email supplier kosong. Isi email di data supplier terlebih dahulu.';
+
+            Log::error('Gagal mengirim email pesanan', [
+                'order_id' => $order->id,
+                'message' => $message,
+            ]);
+
+            if ($rethrow) {
+                throw new \RuntimeException($message);
             }
 
-            $order->forceFill(['supplier_emailed_at' => now()])->save();
+            return false;
+        }
 
-            return true;
+        try {
+            Mail::to($supplierEmail)->send(new OrderToSupplierMail($order, $emailBody));
+            $order->forceFill(['supplier_emailed_at' => now()])->save();
         } catch (\Throwable $e) {
-            Log::error('Gagal mengirim email pesanan', [
+            Log::error('Gagal mengirim email pesanan ke supplier', [
                 'order_id' => $order->id,
                 'message' => $e->getMessage(),
             ]);
@@ -133,6 +152,21 @@ class OrderApprovalService
 
             return false;
         }
+
+        $adminEmail = trim((string) Setting::get('admin_email', ''));
+
+        if ($adminEmail !== '') {
+            try {
+                Mail::to($adminEmail)->send(new OrderCopyToAdminMail($order, $emailBody));
+            } catch (\Throwable $e) {
+                Log::warning('Email supplier terkirim, salinan admin gagal', [
+                    'order_id' => $order->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return true;
     }
 
     private function sendWhatsapp(Order $order, bool $force = false): void
@@ -140,6 +174,8 @@ class OrderApprovalService
         if (! $this->whatsappDeliveryService->canDeliver()) {
             return;
         }
+
+        $this->extendExecutionTime();
 
         $order->loadMissing(['supplier', 'items']);
 
@@ -173,5 +209,14 @@ class OrderApprovalService
     private function whatsappSendInProgress(int $orderId): bool
     {
         return Cache::has('watzap-sending:'.$orderId);
+    }
+
+    private function extendExecutionTime(): void
+    {
+        $seconds = max(120, (int) config('watzap.file_timeout', 90) + 90);
+
+        if (function_exists('set_time_limit')) {
+            @set_time_limit($seconds);
+        }
     }
 }

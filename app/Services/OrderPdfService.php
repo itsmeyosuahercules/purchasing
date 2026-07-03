@@ -54,11 +54,15 @@ class OrderPdfService
     /**
      * Generate PDF ke disk sebelum WatZap fetch — hindari timeout/error saat request eksternal.
      */
-    public function ensureDeliveryCache(Order $order): void
+    public function ensureDeliveryCache(Order $order, bool $force = false): void
     {
         $order->loadMissing(['supplier', 'items', 'user', 'approver']);
 
         $path = $this->deliveryCachePath($order);
+
+        if (! $force && Storage::disk('local')->exists($path) && Storage::disk('local')->size($path) >= 100) {
+            return;
+        }
 
         try {
             $pdf = $this->make($order)->output();

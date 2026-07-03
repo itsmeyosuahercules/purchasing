@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\OrderStatus;
 use App\Enums\UserRole;
 use App\Jobs\SendOrderWhatsappJob;
+use App\Mail\OrderToSupplierMail;
 use App\Models\Order;
 use App\Services\OrderWhatsappDeliveryService;
 use App\Models\Product;
@@ -12,6 +13,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
@@ -83,6 +85,7 @@ class WatzapIntegrationTest extends TestCase
 
     public function test_approve_sends_whatsapp_when_watzap_enabled(): void
     {
+        Mail::fake();
         config(['watzap.attach_pdf' => false]);
 
         Http::fake([
@@ -123,8 +126,10 @@ class WatzapIntegrationTest extends TestCase
 
         $order->refresh();
         $this->assertNotNull($order->supplier_whatsapp_sent_at);
+        $this->assertNotNull($order->supplier_emailed_at);
 
         Http::assertSent(fn ($request) => $request->url() === 'https://api.watzap.id/v1/send_message');
+        Mail::assertSent(OrderToSupplierMail::class);
     }
 
     public function test_resend_whatsapp_calls_watzap_api_with_pdf_url(): void

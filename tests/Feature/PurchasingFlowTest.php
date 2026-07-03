@@ -118,6 +118,7 @@ class PurchasingFlowTest extends TestCase
         $this->assertNotNull($order->valid_until);
         $this->assertNotNull($order->delivery_date);
         Mail::assertSent(OrderToSupplierMail::class, fn (OrderToSupplierMail $mail) => count($mail->attachments()) === 1);
+        $this->assertNotNull($order->supplier_emailed_at);
     }
 
     public function test_admin_can_resend_email_for_approved_order(): void

@@ -15,3 +15,12 @@
         <button @click="show = false" class="text-red-600 hover:text-red-800">&times;</button>
     </div>
 @endif
+
+@if(session('warning'))
+    <div x-data="{ show: true }" x-show="show" x-transition
+         class="mb-5 flex items-start gap-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3">
+        <x-icon name="exclamation-triangle" class="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+        <p class="text-sm flex-1">{{ session('warning') }}</p>
+        <button @click="show = false" class="text-amber-600 hover:text-amber-800">&times;</button>
+    </div>
+@endif
