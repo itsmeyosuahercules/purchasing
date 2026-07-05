@@ -90,7 +90,7 @@ class WatzapIntegrationTest extends TestCase
         Mail::fake();
         config(['watzap.attach_pdf' => false]);
 
-        Setting::set('whatsapp_contact', '08999888777');
+        Setting::set('owner_whatsapp', '08999888777');
 
         Http::fake([
             'https://api.watzap.id/v1/send_message' => Http::response([

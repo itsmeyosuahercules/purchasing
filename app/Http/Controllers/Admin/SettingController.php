@@ -11,7 +11,7 @@ class SettingController extends Controller
     public function edit()
     {
         $keys = [
-            'company_name', 'company_email', 'wechat_contact', 'whatsapp_contact', 'admin_email',
+            'company_name', 'company_email', 'wechat_contact', 'whatsapp_contact', 'owner_whatsapp', 'admin_email',
             'ship_to', 'payment_terms', 'shipping_method', 'incoterms', 'currency',
             'po_validity_days', 'default_delivery_days', 'terms_conditions',
             'default_email_template', 'default_whatsapp_template',

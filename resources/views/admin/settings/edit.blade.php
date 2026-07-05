@@ -11,12 +11,20 @@
                              hint="Contoh: Office@globsrc.com" />
                     <x-input name="wechat_contact" label="WeChat" :value="$settings['wechat_contact']"
                              placeholder="ID WeChat perusahaan" />
-                    <x-input name="whatsapp_contact" label="WhatsApp Owner" :value="$settings['whatsapp_contact']"
+                    <x-input name="whatsapp_contact" label="WhatsApp Perusahaan (PDF)" :value="$settings['whatsapp_contact']"
                              placeholder="089601811756"
-                             hint="Nomor owner: tampil di PDF + salinan WhatsApp setiap PO disetujui." />
+                             hint="Tampil di header Purchase Order sebagai urgent contact." />
                 </div>
+            </div>
+        </x-card>
+
+        <x-card title="Notifikasi Owner" subtitle="Salinan otomatis setiap PO disetujui — untuk cek kesalahan order.">
+            <div class="grid md:grid-cols-2 gap-4">
                 <x-input name="admin_email" type="email" label="Email Owner" :value="$settings['admin_email']"
-                         hint="Salinan email PO (dengan PDF) dikirim ke sini setiap pesanan disetujui." />
+                         hint="Salinan email + PDF PO." />
+                <x-input name="owner_whatsapp" label="WhatsApp Owner" :value="$settings['owner_whatsapp']"
+                         placeholder="08xxxxxxxxxx"
+                         hint="Nomor WA pribadi owner (bukan nomor yang terhubung ke WatZap API). Wajib diisi agar salinan WA terkirim." />
             </div>
         </x-card>
 
@@ -47,7 +55,7 @@
             </div>
         </x-card>
 
-        <x-card title="Template Salinan Owner" subtitle="Dikirim ke Email Owner & WhatsApp Owner di atas setiap PO disetujui.">
+        <x-card title="Template Salinan Owner" subtitle="Dikirim ke Email Owner & WhatsApp Owner (kartu Notifikasi Owner).">
             <div class="space-y-4">
                 <x-textarea name="owner_email_template" label="Template Email (Salinan Owner)" rows="5" :value="$settings['owner_email_template']"
                             hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list}" />

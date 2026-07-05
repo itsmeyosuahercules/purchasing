@@ -35,6 +35,7 @@ class Setting extends Model
             'company_email' => 'Office@globsrc.com',
             'wechat_contact' => '',
             'whatsapp_contact' => '089601811756',
+            'owner_whatsapp' => '',
             'admin_email' => '',
             'ship_to' => 'Will be notified before delivery',
             'payment_terms' => 'As Usual',

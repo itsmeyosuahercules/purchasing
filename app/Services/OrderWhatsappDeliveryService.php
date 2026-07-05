@@ -95,9 +95,13 @@ class OrderWhatsappDeliveryService
 
     private function sendOwnerCopy(Order $order, ?string $downloadUrl = null): void
     {
-        $ownerPhone = trim((string) Setting::get('whatsapp_contact', ''));
+        $ownerPhone = $this->resolveOwnerWhatsapp();
 
         if ($ownerPhone === '') {
+            Log::warning('Salinan WhatsApp owner dilewati — isi field WhatsApp Owner di Pengaturan → Notifikasi Owner', [
+                'order_id' => $order->id,
+            ]);
+
             return;
         }
 
@@ -105,7 +109,16 @@ class OrderWhatsappDeliveryService
 
         if ($supplierPhone !== ''
             && $this->watzapService->normalizePhone($ownerPhone) === $this->watzapService->normalizePhone($supplierPhone)) {
+            Log::info('Salinan WhatsApp owner dilewati — nomor sama dengan supplier', [
+                'order_id' => $order->id,
+            ]);
+
             return;
+        }
+
+        $delay = (int) config('watzap.send_delay_seconds', 3);
+        if ($delay > 0) {
+            sleep($delay);
         }
 
         try {
@@ -121,12 +134,34 @@ class OrderWhatsappDeliveryService
             }
 
             $this->watzapService->sendText($ownerPhone, $message);
-        } catch (\Throwable $e) {
-            Log::warning('Salinan WhatsApp ke owner gagal', [
+
+            Log::info('Salinan WhatsApp owner terkirim', [
                 'order_id' => $order->id,
+                'phone' => $this->maskPhone($ownerPhone),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Salinan WhatsApp ke owner gagal', [
+                'order_id' => $order->id,
+                'phone' => $this->maskPhone($ownerPhone),
                 'message' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function resolveOwnerWhatsapp(): string
+    {
+        return trim((string) Setting::get('owner_whatsapp', ''));
+    }
+
+    private function maskPhone(string $phone): string
+    {
+        $digits = preg_replace('/\D/', '', $phone) ?? '';
+
+        if (strlen($digits) <= 4) {
+            return '****';
+        }
+
+        return str_repeat('*', max(0, strlen($digits) - 4)).substr($digits, -4);
     }
 
     /**

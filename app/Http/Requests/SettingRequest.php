@@ -18,6 +18,7 @@ class SettingRequest extends FormRequest
             'company_email' => ['nullable', 'email', 'max:255'],
             'wechat_contact' => ['nullable', 'string', 'max:255'],
             'whatsapp_contact' => ['nullable', 'string', 'max:255'],
+            'owner_whatsapp' => ['nullable', 'string', 'max:255'],
             'admin_email' => ['nullable', 'email', 'max:255'],
             'ship_to' => ['nullable', 'string', 'max:500'],
             'payment_terms' => ['nullable', 'string', 'max:255'],
