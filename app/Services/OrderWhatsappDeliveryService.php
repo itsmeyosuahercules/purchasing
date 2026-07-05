@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\WatzapDeliveryException;
 use App\Models\Order;
 use App\Models\Setting;
+use App\Support\WhatsappNumber;
 use Illuminate\Support\Facades\Log;
 
 class OrderWhatsappDeliveryService
@@ -139,7 +140,7 @@ class OrderWhatsappDeliveryService
 
     private function resolveOwnerWhatsapp(): string
     {
-        return trim((string) Setting::get('owner_whatsapp', ''));
+        return WhatsappNumber::normalize(trim((string) Setting::get('owner_whatsapp', '')));
     }
 
     private function maskPhone(string $phone): string

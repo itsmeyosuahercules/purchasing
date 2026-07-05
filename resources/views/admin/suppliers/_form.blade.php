@@ -14,7 +14,9 @@
                      hint="Muncul di PDF PO sebagai Attention." />
             <div class="grid md:grid-cols-2 gap-4">
                 <x-input name="email" type="email" label="Email Supplier" :value="$supplier?->email" required />
-                <x-input name="whatsapp" label="Nomor WhatsApp" :value="$supplier?->whatsapp" placeholder="62812xxxxxxx" hint="Format internasional, mis. 62812..." required />
+                <x-input name="whatsapp" label="Nomor WhatsApp (WatZap)" :value="$supplier?->whatsapp"
+                         placeholder="62812xxxxxxx"
+                         hint="Format WatZap API: wajib diawali 62, contoh 628123456789." required />
             </div>
         </div>
     </x-card>

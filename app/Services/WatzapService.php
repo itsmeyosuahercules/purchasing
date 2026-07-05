@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\WatzapDeliveryException;
+use App\Support\WhatsappNumber;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -17,13 +18,7 @@ class WatzapService
 
     public function normalizePhone(string $phone): string
     {
-        $normalized = preg_replace('/\D/', '', $phone) ?? '';
-
-        if (str_starts_with($normalized, '0')) {
-            $normalized = '62'.substr($normalized, 1);
-        }
-
-        return $normalized;
+        return WhatsappNumber::normalize($phone);
     }
 
     /**

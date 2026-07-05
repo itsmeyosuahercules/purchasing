@@ -23,8 +23,8 @@
                 <x-input name="admin_email" type="email" label="Email Owner" :value="$settings['admin_email']"
                          hint="Salinan email + PDF PO." />
                 <x-input name="owner_whatsapp" label="WhatsApp Owner" :value="$settings['owner_whatsapp']"
-                         placeholder="08xxxxxxxxxx"
-                         hint="Nomor WA pribadi owner (bukan nomor yang terhubung ke WatZap API). Wajib diisi agar salinan WA terkirim." />
+                         placeholder="62812xxxxxxx"
+                         hint="Format WatZap API: wajib diawali 62 (contoh 628123456789). Bukan nomor yang terhubung ke WatZap." />
             </div>
         </x-card>
 

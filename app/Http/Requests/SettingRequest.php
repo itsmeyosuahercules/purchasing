@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\WhatsappNumber;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SettingRequest extends FormRequest
@@ -11,6 +12,15 @@ class SettingRequest extends FormRequest
         return $this->user()?->isAdmin() ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('owner_whatsapp')) {
+            $this->merge([
+                'owner_whatsapp' => WhatsappNumber::normalize($this->string('owner_whatsapp')->toString()),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -18,7 +28,7 @@ class SettingRequest extends FormRequest
             'company_email' => ['nullable', 'email', 'max:255'],
             'wechat_contact' => ['nullable', 'string', 'max:255'],
             'whatsapp_contact' => ['nullable', 'string', 'max:255'],
-            'owner_whatsapp' => ['nullable', 'string', 'max:255'],
+            'owner_whatsapp' => ['nullable', 'string', 'max:20', 'regex:/^62\d{8,15}$/'],
             'admin_email' => ['nullable', 'email', 'max:255'],
             'ship_to' => ['nullable', 'string', 'max:500'],
             'payment_terms' => ['nullable', 'string', 'max:255'],
@@ -32,6 +42,13 @@ class SettingRequest extends FormRequest
             'default_whatsapp_template' => ['required', 'string', 'max:5000'],
             'owner_email_template' => ['required', 'string', 'max:5000'],
             'owner_whatsapp_template' => ['required', 'string', 'max:5000'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'owner_whatsapp.regex' => 'WhatsApp Owner untuk WatZap wajib diawali 62, contoh: 628123456789.',
         ];
     }
 }
