@@ -143,6 +143,39 @@ class WatzapIntegrationTest extends TestCase
         Mail::assertSent(OrderToSupplierMail::class);
     }
 
+    public function test_owner_whatsapp_copy_sent_even_when_same_number_as_supplier(): void
+    {
+        config([
+            'watzap.attach_pdf' => false,
+            'watzap.send_delay_seconds' => 0,
+        ]);
+
+        Setting::set('owner_whatsapp', '08123456789');
+
+        Http::fake([
+            'https://api.watzap.id/v1/send_message' => Http::response([
+                'status' => true,
+                'message' => 'success',
+            ]),
+        ]);
+
+        $order = $this->approvedOrder();
+        $admin = User::where('username', 'admin')->firstOrFail();
+
+        app(OrderWhatsappDeliveryService::class)->sendToSupplier($order->fresh(['supplier', 'items']));
+
+        Http::assertSentCount(2);
+
+        $messages = collect(Http::recorded())
+            ->map(fn ($pair) => $pair[0]->data()['message'] ?? '')
+            ->all();
+
+        $this->assertTrue(
+            collect($messages)->contains(fn ($m) => str_contains($m, 'Salinan Owner')),
+            'Pesan salinan owner harus terkirim meski nomor sama dengan supplier.',
+        );
+    }
+
     public function test_whatsapp_template_formats_quantity_without_trailing_decimals(): void
     {
         $order = $this->approvedOrder();

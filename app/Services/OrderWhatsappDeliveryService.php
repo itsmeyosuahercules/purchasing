@@ -105,17 +105,6 @@ class OrderWhatsappDeliveryService
             return;
         }
 
-        $supplierPhone = trim((string) ($order->supplier->whatsapp ?? ''));
-
-        if ($supplierPhone !== ''
-            && $this->watzapService->normalizePhone($ownerPhone) === $this->watzapService->normalizePhone($supplierPhone)) {
-            Log::info('Salinan WhatsApp owner dilewati — nomor sama dengan supplier', [
-                'order_id' => $order->id,
-            ]);
-
-            return;
-        }
-
         $delay = (int) config('watzap.send_delay_seconds', 3);
         if ($delay > 0) {
             sleep($delay);
