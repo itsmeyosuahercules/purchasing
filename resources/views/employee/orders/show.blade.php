@@ -40,7 +40,7 @@
                         @foreach($order->items as $item)
                             <tr class="border-t border-slate-100">
                                 <td class="px-5 py-3.5 font-medium text-slate-900">{{ $item->product_name }}</td>
-                                <td class="px-5 py-3.5 text-right tabular-nums">{{ rtrim(rtrim(number_format($item->quantity, 2, ',', '.'), '0'), ',') }}</td>
+                                <td class="px-5 py-3.5 text-right tabular-nums">{{ \App\Support\QuantityFormatter::format($item->quantity) }}</td>
                                 <td class="px-5 py-3.5">{{ $item->unit }}</td>
                             </tr>
                         @endforeach

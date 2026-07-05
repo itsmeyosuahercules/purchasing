@@ -14,7 +14,7 @@ class SettingController extends Controller
             'company_name', 'company_email', 'wechat_contact', 'whatsapp_contact', 'admin_email',
             'ship_to', 'payment_terms', 'shipping_method', 'incoterms', 'currency',
             'po_validity_days', 'default_delivery_days', 'terms_conditions',
-            'default_email_template', 'default_whatsapp_template',
+            'default_email_template', 'default_whatsapp_template', 'owner_whatsapp_template',
         ];
 
         $settings = collect($keys)->mapWithKeys(

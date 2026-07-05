@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\Setting;
+use App\Support\QuantityFormatter;
 
 class OrderTemplateService
 {
@@ -46,11 +47,22 @@ class OrderTemplateService
         return $this->render($order, $template, $pdfDownloadLink);
     }
 
+    public function getOwnerWhatsappTemplate(Order $order, ?string $pdfDownloadLink = null): string
+    {
+        $template = Setting::get(
+            'owner_whatsapp_template',
+            Setting::defaults()['owner_whatsapp_template'],
+        );
+
+        return $this->render($order, $template, $pdfDownloadLink);
+    }
+
     private function formatItemsList(Order $order, bool $withPrice): string
     {
         return $order->items
             ->map(function ($item) use ($withPrice) {
-                $line = "- {$item->product_name}: {$item->quantity} {$item->unit}";
+                $qty = QuantityFormatter::format($item->quantity);
+                $line = "- {$item->product_name}: {$qty} {$item->unit}";
 
                 if ($withPrice) {
                     $price = number_format((float) $item->price, 0, ',', '.');

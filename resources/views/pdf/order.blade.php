@@ -222,10 +222,11 @@
 </head>
 <body>
     @php
+        use App\Support\QuantityFormatter;
         $poDate = $order->poDate();
         $formatDate = fn ($date) => $date ? $date->format('d M Y') : '—';
         $formatMoney = fn ($amount) => number_format((float) $amount, 2, '.', ',');
-        $formatQty = fn ($qty) => rtrim(rtrim(number_format((float) $qty, 2, '.', ','), '0'), '.');
+        $formatQty = fn ($qty) => QuantityFormatter::format($qty, '.');
         $dash = '—';
         $supplierName = $forEmployee ? $order->supplier->alias_name : $order->supplier->real_name;
         $wechatQr = public_path('templates/purchase-order/assets/logo-1.png');

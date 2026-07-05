@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Exceptions\WatzapDeliveryException;
 use App\Models\Order;
+use App\Models\Setting;
+use Illuminate\Support\Facades\Log;
 
 class OrderWhatsappDeliveryService
 {
@@ -52,10 +54,12 @@ class OrderWhatsappDeliveryService
         $order->loadMissing('supplier');
 
         $phone = $order->supplier->whatsapp;
+        $downloadUrl = null;
 
         if ($this->shouldAttachPdf()) {
             if ($this->usesLinkSendMode()) {
-                $this->sendWithPdfDownloadLink($order, $phone);
+                $downloadUrl = $this->shortPdfDownloadUrl($order);
+                $this->sendWithPdfDownloadLink($order, $phone, $downloadUrl);
             } else {
                 $message = $this->templateService->getWhatsappTemplate($order);
                 $this->sendWithPdfAttachment($order, $phone, $message);
@@ -64,6 +68,8 @@ class OrderWhatsappDeliveryService
             $message = $this->templateService->getWhatsappTemplate($order);
             $this->watzapService->sendText($phone, $message);
         }
+
+        $this->sendOwnerCopy($order, $downloadUrl);
 
         $order->forceFill([
             'supplier_whatsapp_sent_at' => now(),
@@ -74,9 +80,9 @@ class OrderWhatsappDeliveryService
     /**
      * Mode link: 1x send_message dengan URL unduh PDF (auto-download saat diklik).
      */
-    private function sendWithPdfDownloadLink(Order $order, string $phone): void
+    private function sendWithPdfDownloadLink(Order $order, string $phone, ?string $downloadUrl = null): void
     {
-        $downloadUrl = $this->shortPdfDownloadUrl($order);
+        $downloadUrl ??= $this->shortPdfDownloadUrl($order);
         $message = $this->templateService->getWhatsappTemplate($order, $downloadUrl);
 
         if (! str_contains($message, $downloadUrl)) {
@@ -85,6 +91,42 @@ class OrderWhatsappDeliveryService
         }
 
         $this->watzapService->sendText($phone, $message);
+    }
+
+    private function sendOwnerCopy(Order $order, ?string $downloadUrl = null): void
+    {
+        $ownerPhone = trim((string) Setting::get('whatsapp_contact', ''));
+
+        if ($ownerPhone === '') {
+            return;
+        }
+
+        $supplierPhone = trim((string) ($order->supplier->whatsapp ?? ''));
+
+        if ($supplierPhone !== ''
+            && $this->watzapService->normalizePhone($ownerPhone) === $this->watzapService->normalizePhone($supplierPhone)) {
+            return;
+        }
+
+        try {
+            if ($downloadUrl === null && $this->shouldAttachPdf() && $this->usesLinkSendMode()) {
+                $downloadUrl = $this->shortPdfDownloadUrl($order);
+            }
+
+            $message = $this->templateService->getOwnerWhatsappTemplate($order, $downloadUrl);
+
+            if ($downloadUrl !== null && ! str_contains($message, $downloadUrl)) {
+                $days = (int) config('watzap.pdf_link_ttl_days', 7);
+                $message = rtrim($message)."\n\nUnduh PO {$order->order_number}:\n{$downloadUrl}\n(Link aktif {$days} hari)";
+            }
+
+            $this->watzapService->sendText($ownerPhone, $message);
+        } catch (\Throwable $e) {
+            Log::warning('Salinan WhatsApp ke owner gagal', [
+                'order_id' => $order->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

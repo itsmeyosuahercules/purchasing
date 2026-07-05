@@ -7,6 +7,8 @@ use App\Enums\UserRole;
 use App\Jobs\SendOrderWhatsappJob;
 use App\Mail\OrderToSupplierMail;
 use App\Models\Order;
+use App\Models\Setting;
+use App\Services\OrderTemplateService;
 use App\Services\OrderWhatsappDeliveryService;
 use App\Models\Product;
 use App\Models\Supplier;
@@ -88,6 +90,8 @@ class WatzapIntegrationTest extends TestCase
         Mail::fake();
         config(['watzap.attach_pdf' => false]);
 
+        Setting::set('whatsapp_contact', '08999888777');
+
         Http::fake([
             'https://api.watzap.id/v1/send_message' => Http::response([
                 'status' => true,
@@ -128,8 +132,27 @@ class WatzapIntegrationTest extends TestCase
         $this->assertNotNull($order->supplier_whatsapp_sent_at);
         $this->assertNotNull($order->supplier_emailed_at);
 
-        Http::assertSent(fn ($request) => $request->url() === 'https://api.watzap.id/v1/send_message');
+        Http::assertSentCount(2);
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://api.watzap.id/v1/send_message') {
+                return false;
+            }
+
+            return str_contains((string) ($request->data()['message'] ?? ''), 'Salinan Owner');
+        });
         Mail::assertSent(OrderToSupplierMail::class);
+    }
+
+    public function test_whatsapp_template_formats_quantity_without_trailing_decimals(): void
+    {
+        $order = $this->approvedOrder();
+        $order->items()->first()->update(['quantity' => 2, 'unit' => 'pcs']);
+
+        $body = app(OrderTemplateService::class)->getWhatsappTemplate($order->fresh(['supplier', 'items']));
+
+        $this->assertStringContainsString('2 pcs', $body);
+        $this->assertStringNotContainsString('2.00', $body);
+        $this->assertStringNotContainsString('2,00', $body);
     }
 
     public function test_resend_whatsapp_calls_watzap_api_with_pdf_url(): void

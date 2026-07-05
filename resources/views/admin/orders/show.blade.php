@@ -53,7 +53,7 @@
                                 <div><dt class="text-slate-500">Brand</dt><dd class="text-slate-800">{{ $item->brand ?: '—' }}</dd></div>
                                 <div><dt class="text-slate-500">Unit</dt><dd class="text-slate-800">{{ $item->unit }}</dd></div>
                                 <div class="sm:col-span-2"><dt class="text-slate-500">Description</dt><dd class="text-slate-800">{{ $item->description ?: '—' }}</dd></div>
-                                <div><dt class="text-slate-500">Qty</dt><dd class="text-slate-800 tabular-nums">{{ rtrim(rtrim(number_format($item->quantity, 2, ',', '.'), '0'), ',') }}</dd></div>
+                                <div><dt class="text-slate-500">Qty</dt><dd class="text-slate-800 tabular-nums">{{ \App\Support\QuantityFormatter::format($item->quantity) }}</dd></div>
                                 <div><dt class="text-slate-500">Unit Price</dt><dd class="text-slate-800 tabular-nums">Rp {{ number_format($item->price, 2, ',', '.') }}</dd></div>
                                 <div><dt class="text-slate-500">Amount</dt><dd class="text-slate-900 font-medium tabular-nums">Rp {{ number_format($item->amount(), 2, ',', '.') }}</dd></div>
                             </dl>

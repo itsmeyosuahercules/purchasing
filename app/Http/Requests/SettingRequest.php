@@ -29,6 +29,7 @@ class SettingRequest extends FormRequest
             'terms_conditions' => ['nullable', 'string', 'max:10000'],
             'default_email_template' => ['required', 'string', 'max:5000'],
             'default_whatsapp_template' => ['required', 'string', 'max:5000'],
+            'owner_whatsapp_template' => ['required', 'string', 'max:5000'],
         ];
     }
 }

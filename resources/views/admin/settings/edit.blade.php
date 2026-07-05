@@ -11,11 +11,12 @@
                              hint="Contoh: Office@globsrc.com" />
                     <x-input name="wechat_contact" label="WeChat" :value="$settings['wechat_contact']"
                              placeholder="ID WeChat perusahaan" />
-                    <x-input name="whatsapp_contact" label="WhatsApp" :value="$settings['whatsapp_contact']"
-                             placeholder="089601811756" />
+                    <x-input name="whatsapp_contact" label="WhatsApp Owner" :value="$settings['whatsapp_contact']"
+                             placeholder="089601811756"
+                             hint="Nomor owner: tampil di PDF + salinan WhatsApp setiap PO disetujui." />
                 </div>
-                <x-input name="admin_email" type="email" label="Email Admin" :value="$settings['admin_email']"
-                         hint="Salinan setiap pesanan yang disetujui dikirim ke sini." />
+                <x-input name="admin_email" type="email" label="Email Owner" :value="$settings['admin_email']"
+                         hint="Salinan email PO (dengan PDF) dikirim ke sini setiap pesanan disetujui." />
             </div>
         </x-card>
 
@@ -41,8 +42,10 @@
             <div class="space-y-4">
                 <x-textarea name="default_email_template" label="Template Email" rows="6" :value="$settings['default_email_template']"
                             hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list}" />
-                <x-textarea name="default_whatsapp_template" label="Template WhatsApp" rows="6" :value="$settings['default_whatsapp_template']"
-                            hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list_no_price}, {pdf_download_link} (wajib untuk mode link WA)" />
+                <x-textarea name="default_whatsapp_template" label="Template WhatsApp (ke Supplier)" rows="6" :value="$settings['default_whatsapp_template']"
+                            hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list_no_price}, {pdf_download_link}" />
+                <x-textarea name="owner_whatsapp_template" label="Template WhatsApp (Salinan Owner)" rows="5" :value="$settings['owner_whatsapp_template']"
+                            hint="Dikirim ke nomor WhatsApp Owner di atas. Placeholder sama + {items_list} (dengan harga)." />
             </div>
         </x-card>
 
