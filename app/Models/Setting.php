@@ -47,6 +47,7 @@ class Setting extends Model
             'default_email_template' => "Yth. {supplier_name},\n\nBerikut pesanan dari {company_name} (No. {order_number}):\n\n{items_list}\n\nMohon konfirmasi ketersediaan. Terima kasih.",
             'default_whatsapp_template' => "Halo {supplier_name},\n\nPesanan dari {company_name} (No. {order_number}):\n\n{items_list_no_price}\n\nMohon konfirmasi ketersediaan. Terima kasih.\n\n{pdf_download_link}",
             'owner_whatsapp_template' => "[Salinan Owner] PO {order_number} disetujui ke {supplier_name}:\n\n{items_list}\n\n{pdf_download_link}",
+            'owner_email_template' => "[Salinan Owner] PO {order_number} telah disetujui dan dikirim ke {supplier_name}.\n\nDetail pesanan:\n{items_list}\n\nLampiran: PDF Purchase Order.",
         ];
     }
 }

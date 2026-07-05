@@ -38,14 +38,21 @@
             </div>
         </x-card>
 
-        <x-card title="Template Pesan Default" subtitle="Dipakai jika supplier tidak punya template khusus.">
+        <x-card title="Template Pesan ke Supplier" subtitle="Dipakai jika supplier tidak punya template khusus.">
             <div class="space-y-4">
                 <x-textarea name="default_email_template" label="Template Email" rows="6" :value="$settings['default_email_template']"
                             hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list}" />
-                <x-textarea name="default_whatsapp_template" label="Template WhatsApp (ke Supplier)" rows="6" :value="$settings['default_whatsapp_template']"
+                <x-textarea name="default_whatsapp_template" label="Template WhatsApp" rows="6" :value="$settings['default_whatsapp_template']"
                             hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list_no_price}, {pdf_download_link}" />
+            </div>
+        </x-card>
+
+        <x-card title="Template Salinan Owner" subtitle="Dikirim ke Email Owner & WhatsApp Owner di atas setiap PO disetujui.">
+            <div class="space-y-4">
+                <x-textarea name="owner_email_template" label="Template Email (Salinan Owner)" rows="5" :value="$settings['owner_email_template']"
+                            hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list}" />
                 <x-textarea name="owner_whatsapp_template" label="Template WhatsApp (Salinan Owner)" rows="5" :value="$settings['owner_whatsapp_template']"
-                            hint="Dikirim ke nomor WhatsApp Owner di atas. Placeholder sama + {items_list} (dengan harga)." />
+                            hint="Placeholder: {company_name}, {supplier_name}, {order_number}, {date}, {items_list}, {pdf_download_link}" />
             </div>
         </x-card>
 

@@ -47,6 +47,16 @@ class OrderTemplateService
         return $this->render($order, $template, $pdfDownloadLink);
     }
 
+    public function getOwnerEmailTemplate(Order $order): string
+    {
+        $template = Setting::get(
+            'owner_email_template',
+            Setting::defaults()['owner_email_template'],
+        );
+
+        return $this->render($order, $template);
+    }
+
     public function getOwnerWhatsappTemplate(Order $order, ?string $pdfDownloadLink = null): string
     {
         $template = Setting::get(

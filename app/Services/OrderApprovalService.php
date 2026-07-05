@@ -157,9 +157,10 @@ class OrderApprovalService
 
         if ($adminEmail !== '') {
             try {
-                Mail::to($adminEmail)->send(new OrderCopyToAdminMail($order, $emailBody));
+                $ownerEmailBody = $this->templateService->getOwnerEmailTemplate($order);
+                Mail::to($adminEmail)->send(new OrderCopyToAdminMail($order, $ownerEmailBody));
             } catch (\Throwable $e) {
-                Log::warning('Email supplier terkirim, salinan admin gagal', [
+                Log::warning('Email supplier terkirim, salinan owner gagal', [
                     'order_id' => $order->id,
                     'message' => $e->getMessage(),
                 ]);
