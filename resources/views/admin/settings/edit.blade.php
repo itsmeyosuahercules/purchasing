@@ -9,8 +9,8 @@
                 <div class="grid md:grid-cols-2 gap-4">
                     <x-input name="company_email" type="email" label="Email Perusahaan" :value="$settings['company_email']"
                              hint="Contoh: Office@globsrc.com" />
-                    <x-input name="wechat_contact" label="WeChat" :value="$settings['wechat_contact']"
-                             placeholder="ID WeChat perusahaan" />
+                    {{-- <x-input name="wechat_contact" label="WeChat" :value="$settings['wechat_contact']"
+                             placeholder="ID WeChat perusahaan" /> --}}
                     <x-input name="whatsapp_contact" label="WhatsApp Perusahaan (PDF)" :value="$settings['whatsapp_contact']"
                              placeholder="089601811756"
                              hint="Tampil di header Purchase Order sebagai urgent contact." />
